@@ -394,7 +394,10 @@ client.on('message', async (msg) => {
 
   if (!cita) {
     // No hay cita pendiente para este número, ignorar silenciosamente
-    console.log(`   ℹ️  No hay cita pendiente para ${numero}`);
+    console.log(`   ℹ️  Sin cita pendiente para: ${numero}`);
+    if (citasPendientes.size > 0) {
+      console.log(`   📋 IDs en espera: ${[...citasPendientes.keys()].join(' | ')}`);
+    }
     return;
   }
 
@@ -453,11 +456,12 @@ async function enviarMensajeACita(cita) {
     await actualizarConfirmacion(cita.rowIndex, 'NUMERO_INVALIDO');
     throw new Error(`Número no encontrado en WhatsApp: ${cita.telefono}`);
   }
-  const whatsappId = `${cita.telefono}@c.us`;
+  // Usar el ID canónico que WhatsApp asigna, así msg.from siempre coincide
+  const whatsappId = numberId._serialized;
   await client.sendMessage(whatsappId, getMensajeCita(cita));
   await marcarComoEnviado(cita.rowIndex);
   citasPendientes.set(whatsappId, cita);
-  console.log(`   ✉️  Mensaje enviado a ${cita.nombre} (${cita.telefono})`);
+  console.log(`   ✉️  Mensaje enviado a ${cita.nombre} — ID WhatsApp: ${whatsappId}`);
 }
 
 /**
@@ -471,7 +475,9 @@ async function cargarCitasPendientes() {
 
     for (const cita of citas) {
       if (cita.confirmacion === 'ENVIADO') {
-        const whatsappId = `${cita.telefono}@c.us`;
+        // Usar el mismo ID canónico que usa WhatsApp para que msg.from coincida
+        const numberId = await client.getNumberId(cita.telefono);
+        const whatsappId = numberId ? numberId._serialized : `${cita.telefono}@c.us`;
         citasPendientes.set(whatsappId, cita);
         cargadas++;
       }
