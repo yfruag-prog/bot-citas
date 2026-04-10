@@ -57,12 +57,15 @@ const servidorQR = http.createServer(async (req, res) => {
       qrDataUrl = null;
       citasPendientes.clear();
       try {
-        await client.logout();           // cierra sesión y borra .wwebjs_auth/
+        await client.logout();  // cierra sesión y borra .wwebjs_auth/
       } catch (err) {
-        // Si ya estaba desconectado, igual reiniciamos
         console.warn('Logout error (ignorado):', err.message);
-        client.initialize();
       }
+      // Reiniciar explícitamente después de que logout termine de limpiar
+      setTimeout(() => {
+        console.log('🔄 Reiniciando cliente para generar nuevo QR...');
+        client.initialize().catch(err => console.error('Error al reiniciar:', err.message));
+      }, 3000);
     }, 400);
     return;
   }
@@ -234,8 +237,13 @@ client.on('disconnected', (reason) => {
   console.log('⚠️  WhatsApp desconectado:', reason);
   botConectado = false;
   qrDataUrl = null;
-  console.log('🔄 Reiniciando para mostrar nuevo QR...');
-  client.initialize();
+  // LOGOUT lo maneja el POST handler con su propio delay; aquí solo atendemos caídas inesperadas
+  if (reason !== 'LOGOUT') {
+    console.log('🔄 Reiniciando para mostrar nuevo QR...');
+    setTimeout(() => {
+      client.initialize().catch(err => console.error('Error al reiniciar:', err.message));
+    }, 2000);
+  }
 });
 
 // =============================================
