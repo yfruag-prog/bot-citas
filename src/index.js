@@ -32,13 +32,49 @@ const citasPendientes = new Map();
 let qrDataUrl = null;   // QR como imagen base64
 let botConectado = false;
 
+// HTML compartido: botón de cambiar número
+const htmlBotonCambiar = `
+  <form method="POST" action="/cambiar-numero" style="margin-top:32px"
+        onsubmit="return confirm('¿Seguro que quieres desconectar el número actual y vincular uno nuevo? El bot dejará de funcionar unos segundos.')">
+    <button type="submit"
+      style="background:#ef4444;color:#fff;border:none;padding:12px 28px;
+             font-size:15px;border-radius:8px;cursor:pointer">
+      🔄 Cambiar número de WhatsApp
+    </button>
+  </form>`;
+
 const servidorQR = http.createServer(async (req, res) => {
+  // ── Acción: cambiar número ──────────────────────────────────────────────
+  if (req.method === 'POST' && req.url === '/cambiar-numero') {
+    // Redirigir al usuario de inmediato para que vea la pantalla de carga
+    res.writeHead(302, { 'Location': '/' });
+    res.end();
+
+    // Desconectar después de que el redirect llegue al navegador
+    setTimeout(async () => {
+      console.log('\n🔄 Cambiando número de WhatsApp desde el panel web...');
+      botConectado = false;
+      qrDataUrl = null;
+      citasPendientes.clear();
+      try {
+        await client.logout();           // cierra sesión y borra .wwebjs_auth/
+      } catch (err) {
+        // Si ya estaba desconectado, igual reiniciamos
+        console.warn('Logout error (ignorado):', err.message);
+        client.initialize();
+      }
+    }, 400);
+    return;
+  }
+
+  // ── Estado JSON ─────────────────────────────────────────────────────────
   if (req.url === '/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ conectado: botConectado }));
     return;
   }
 
+  // ── Páginas HTML ────────────────────────────────────────────────────────
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
 
   if (botConectado) {
@@ -47,6 +83,7 @@ const servidorQR = http.createServer(async (req, res) => {
 <body style="font-family:sans-serif;text-align:center;padding:60px;background:#f0fff4">
   <h1 style="color:#22c55e">✅ WhatsApp Conectado</h1>
   <p>El bot está activo y funcionando correctamente.</p>
+  ${htmlBotonCambiar}
 </body></html>`);
     return;
   }
@@ -59,6 +96,7 @@ const servidorQR = http.createServer(async (req, res) => {
 <body style="font-family:sans-serif;text-align:center;padding:60px">
   <h2>⏳ Generando QR...</h2>
   <p>La página se actualizará sola en unos segundos.</p>
+  ${htmlBotonCambiar}
 </body></html>`);
     return;
   }
@@ -74,6 +112,7 @@ const servidorQR = http.createServer(async (req, res) => {
   <p style="color:#555">WhatsApp &rarr; Dispositivos vinculados &rarr; Vincular dispositivo</p>
   <img src="${qrDataUrl}" style="width:280px;border:1px solid #ddd;border-radius:12px;padding:12px">
   <p style="color:#aaa;font-size:13px">Se recarga automáticamente cada 30 s &bull; El QR expira cada ~20 s</p>
+  ${htmlBotonCambiar}
 </body></html>`);
 });
 
@@ -193,7 +232,9 @@ client.on('message', async (msg) => {
 // Manejar desconexión
 client.on('disconnected', (reason) => {
   console.log('⚠️  WhatsApp desconectado:', reason);
-  console.log('🔄 Reiniciando...');
+  botConectado = false;
+  qrDataUrl = null;
+  console.log('🔄 Reiniciando para mostrar nuevo QR...');
   client.initialize();
 });
 
