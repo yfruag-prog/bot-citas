@@ -32,36 +32,154 @@ const citasPendientes = new Map();
 let qrDataUrl = null;   // QR como imagen base64
 let botConectado = false;
 
-// HTML compartido: botón de cambiar número
+// ── Helpers del servidor web ──────────────────────────────────────────────
+
+function parsearBody(req) {
+  return new Promise(resolve => {
+    let raw = '';
+    req.on('data', chunk => raw += chunk);
+    req.on('end', () => resolve(Object.fromEntries(new URLSearchParams(raw))));
+  });
+}
+
+function escHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function badgeEstado(estado) {
+  const cfg = {
+    '':                ['#e2e8f0','#475569','Sin enviar'],
+    'ENVIADO':         ['#dbeafe','#1d4ed8','Esperando respuesta'],
+    'CONFIRMADO':      ['#dcfce7','#15803d','Confirmado ✓'],
+    'CANCELADO':       ['#fee2e2','#b91c1c','Cancelado'],
+    'NUMERO_INVALIDO': ['#ffedd5','#c2410c','Número inválido'],
+  };
+  const [bg, color, label] = cfg[estado] || ['#e2e8f0','#475569', estado || 'Sin enviar'];
+  return `<span style="background:${bg};color:${color};padding:3px 10px;border-radius:999px;font-size:12px;white-space:nowrap">${label}</span>`;
+}
+
+function htmlNav(activa) {
+  return `<nav style="background:#1e293b;padding:12px 24px;display:flex;align-items:center;gap:24px">
+  <span style="color:#fff;font-weight:700">🤖 Bot Citas</span>
+  <a href="/" style="color:${activa === 'estado' ? '#fff' : '#94a3b8'};text-decoration:none;font-size:14px">Estado</a>
+  <a href="/citas" style="color:${activa === 'citas' ? '#fff' : '#94a3b8'};text-decoration:none;font-size:14px">Citas</a>
+</nav>`;
+}
+
 const htmlBotonCambiar = `
-  <form method="POST" action="/cambiar-numero" style="margin-top:32px"
-        onsubmit="return confirm('¿Seguro que quieres desconectar el número actual y vincular uno nuevo? El bot dejará de funcionar unos segundos.')">
+  <form method="POST" action="/cambiar-numero" style="margin-top:20px"
+        onsubmit="return confirm('¿Seguro que quieres desconectar el número actual y vincular uno nuevo?')">
     <button type="submit"
-      style="background:#ef4444;color:#fff;border:none;padding:12px 28px;
-             font-size:15px;border-radius:8px;cursor:pointer">
+      style="background:#ef4444;color:#fff;border:none;padding:10px 24px;
+             font-size:14px;border-radius:8px;cursor:pointer">
       🔄 Cambiar número de WhatsApp
     </button>
   </form>`;
 
+function renderCitasPage(citas) {
+  const pendientesCount = citas.filter(c => !c.confirmacion || c.confirmacion === '').length;
+
+  const filas = citas.length === 0
+    ? '<tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8">No hay citas registradas</td></tr>'
+    : citas.map(cita => {
+        const sinEnviar = !cita.confirmacion || cita.confirmacion === '';
+        const btnEnviar = sinEnviar && botConectado
+          ? `<form method="POST" action="/enviar-cita" style="margin:0">
+               <input type="hidden" name="rowIndex" value="${cita.rowIndex}">
+               <button type="submit"
+                 onclick="return confirm('¿Enviar mensaje a ${escHtml(cita.nombre)}?')"
+                 style="background:#2563eb;color:#fff;border:none;padding:5px 12px;
+                        border-radius:6px;cursor:pointer;font-size:13px">
+                 Enviar
+               </button>
+             </form>`
+          : '';
+        return `<tr style="border-bottom:1px solid #f1f5f9">
+          <td style="padding:10px 12px">${escHtml(cita.nombre)}</td>
+          <td style="padding:10px 12px">${escHtml(cita.telefono)}</td>
+          <td style="padding:10px 12px;white-space:nowrap">${escHtml(cita.fecha)}</td>
+          <td style="padding:10px 12px">${escHtml(cita.hora)}</td>
+          <td style="padding:10px 12px">${escHtml(cita.servicio)}</td>
+          <td style="padding:10px 12px">${badgeEstado(cita.confirmacion)}</td>
+          <td style="padding:10px 12px">${btnEnviar}</td>
+        </tr>`;
+      }).join('');
+
+  const alertaDesconectado = !botConectado
+    ? `<div style="background:#fef9c3;border:1px solid #fde047;padding:12px 16px;
+                   border-radius:8px;margin-bottom:16px">
+         ⚠️ WhatsApp no está conectado — <a href="/">Conectar →</a>
+       </div>`
+    : '';
+
+  const btnEnviarTodo = pendientesCount > 0 && botConectado
+    ? `<form method="POST" action="/enviar-todo" style="display:inline-block"
+           onsubmit="return confirm('¿Enviar mensaje a los ${pendientesCount} contacto(s) sin enviar?')">
+         <button type="submit"
+           style="background:#16a34a;color:#fff;border:none;padding:10px 22px;
+                  font-size:14px;border-radius:8px;cursor:pointer">
+           📤 Enviar a los ${pendientesCount} pendientes
+         </button>
+       </form>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8">
+  <title>Bot Citas - Citas</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="refresh" content="30">
+</head>
+<body style="font-family:sans-serif;margin:0;background:#f8fafc">
+  ${htmlNav('citas')}
+  <div style="max-width:960px;margin:0 auto;padding:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <h1 style="margin:0;font-size:20px">
+        📋 Citas <span style="color:#94a3b8;font-weight:normal">(${citas.length})</span>
+      </h1>
+      ${btnEnviarTodo}
+    </div>
+    ${alertaDesconectado}
+    <div style="background:#fff;border-radius:10px;overflow:auto;
+                box-shadow:0 1px 3px rgba(0,0,0,.08)">
+      <table style="width:100%;border-collapse:collapse;font-size:14px;min-width:700px">
+        <thead>
+          <tr style="background:#f1f5f9;text-align:left">
+            <th style="padding:12px">Nombre</th>
+            <th style="padding:12px">Teléfono</th>
+            <th style="padding:12px">Fecha</th>
+            <th style="padding:12px">Hora</th>
+            <th style="padding:12px">Servicio</th>
+            <th style="padding:12px">Estado</th>
+            <th style="padding:12px">Acción</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+    <p style="color:#94a3b8;font-size:12px;margin-top:10px">Se actualiza automáticamente cada 30 s</p>
+  </div>
+</body></html>`;
+}
+
 const servidorQR = http.createServer(async (req, res) => {
-  // ── Acción: cambiar número ──────────────────────────────────────────────
+  // ── POST /cambiar-numero ──────────────────────────────────────────────────
   if (req.method === 'POST' && req.url === '/cambiar-numero') {
-    // Redirigir al usuario de inmediato para que vea la pantalla de carga
     res.writeHead(302, { 'Location': '/' });
     res.end();
-
-    // Desconectar después de que el redirect llegue al navegador
     setTimeout(async () => {
       console.log('\n🔄 Cambiando número de WhatsApp desde el panel web...');
       botConectado = false;
       qrDataUrl = null;
       citasPendientes.clear();
       try {
-        await client.logout();  // cierra sesión y borra .wwebjs_auth/
+        await client.logout();
       } catch (err) {
         console.warn('Logout error (ignorado):', err.message);
       }
-      // Reiniciar explícitamente después de que logout termine de limpiar
       setTimeout(() => {
         console.log('🔄 Reiniciando cliente para generar nuevo QR...');
         client.initialize().catch(err => console.error('Error al reiniciar:', err.message));
@@ -70,36 +188,109 @@ const servidorQR = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── Estado JSON ─────────────────────────────────────────────────────────
+  // ── POST /enviar-todo ─────────────────────────────────────────────────────
+  if (req.method === 'POST' && req.url === '/enviar-todo') {
+    res.writeHead(302, { 'Location': '/citas' });
+    res.end();
+    if (!botConectado) return;
+    setTimeout(async () => {
+      try {
+        console.log('\n📤 Envío manual (todos los pendientes) desde panel web...');
+        const citas = await getCitas();
+        const pendientes = citas.filter(c => !c.confirmacion || c.confirmacion === '');
+        let enviados = 0;
+        for (const cita of pendientes) {
+          try {
+            await enviarMensajeACita(cita);
+            enviados++;
+            await sleep(2000);
+          } catch (err) {
+            console.error(`   ❌ Error enviando a ${cita.nombre}:`, err.message);
+          }
+        }
+        console.log(`📊 Envío manual completado: ${enviados}/${pendientes.length}\n`);
+      } catch (err) {
+        console.error('Error en envío masivo:', err.message);
+      }
+    }, 200);
+    return;
+  }
+
+  // ── POST /enviar-cita ─────────────────────────────────────────────────────
+  if (req.method === 'POST' && req.url === '/enviar-cita') {
+    const body = await parsearBody(req);
+    const rowIndex = parseInt(body.rowIndex);
+    res.writeHead(302, { 'Location': '/citas' });
+    res.end();
+    if (!botConectado || isNaN(rowIndex)) return;
+    setTimeout(async () => {
+      try {
+        const citas = await getCitas();
+        const cita = citas.find(c => c.rowIndex === rowIndex);
+        if (!cita) { console.error(`Cita rowIndex ${rowIndex} no encontrada`); return; }
+        await enviarMensajeACita(cita);
+        console.log(`📤 Envío individual desde panel web: ${cita.nombre}\n`);
+      } catch (err) {
+        console.error('Error en envío individual:', err.message);
+      }
+    }, 200);
+    return;
+  }
+
+  // ── GET /status ───────────────────────────────────────────────────────────
   if (req.url === '/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ conectado: botConectado }));
     return;
   }
 
-  // ── Páginas HTML ────────────────────────────────────────────────────────
+  // ── GET /citas ────────────────────────────────────────────────────────────
+  if (req.url === '/citas') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    try {
+      const citas = await getCitas();
+      res.end(renderCitasPage(citas));
+    } catch (err) {
+      res.end(`<p>Error al cargar citas: ${escHtml(err.message)}</p><a href="/citas">Reintentar</a>`);
+    }
+    return;
+  }
+
+  // ── GET / ─────────────────────────────────────────────────────────────────
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
 
   if (botConectado) {
     res.end(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Bot WhatsApp</title></head>
-<body style="font-family:sans-serif;text-align:center;padding:60px;background:#f0fff4">
-  <h1 style="color:#22c55e">✅ WhatsApp Conectado</h1>
-  <p>El bot está activo y funcionando correctamente.</p>
-  ${htmlBotonCambiar}
+<body style="font-family:sans-serif;margin:0;background:#f8fafc">
+  ${htmlNav('estado')}
+  <div style="text-align:center;padding:60px 20px">
+    <h1 style="color:#22c55e">✅ WhatsApp Conectado</h1>
+    <p style="color:#64748b">El bot está activo y funcionando correctamente.</p>
+    <a href="/citas"
+       style="display:inline-block;padding:10px 22px;background:#2563eb;color:#fff;
+              border-radius:8px;text-decoration:none;font-size:15px">
+      📋 Ver citas
+    </a>
+    ${htmlBotonCambiar}
+  </div>
 </body></html>`);
     return;
   }
 
   if (!qrDataUrl) {
     res.end(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Bot WhatsApp - QR</title>
-<meta http-equiv="refresh" content="5">
+<html><head>
+  <meta charset="utf-8"><title>Bot WhatsApp - QR</title>
+  <meta http-equiv="refresh" content="5">
 </head>
-<body style="font-family:sans-serif;text-align:center;padding:60px">
-  <h2>⏳ Generando QR...</h2>
-  <p>La página se actualizará sola en unos segundos.</p>
-  ${htmlBotonCambiar}
+<body style="font-family:sans-serif;margin:0;background:#f8fafc">
+  ${htmlNav('estado')}
+  <div style="text-align:center;padding:60px 20px">
+    <h2>⏳ Generando QR...</h2>
+    <p style="color:#64748b">La página se actualizará sola en unos segundos.</p>
+    ${htmlBotonCambiar}
+  </div>
 </body></html>`);
     return;
   }
@@ -110,12 +301,15 @@ const servidorQR = http.createServer(async (req, res) => {
   <title>Bot WhatsApp - Escanea el QR</title>
   <meta http-equiv="refresh" content="30">
 </head>
-<body style="font-family:sans-serif;text-align:center;padding:40px">
-  <h1>📱 Escanea el QR con WhatsApp</h1>
-  <p style="color:#555">WhatsApp &rarr; Dispositivos vinculados &rarr; Vincular dispositivo</p>
-  <img src="${qrDataUrl}" style="width:280px;border:1px solid #ddd;border-radius:12px;padding:12px">
-  <p style="color:#aaa;font-size:13px">Se recarga automáticamente cada 30 s &bull; El QR expira cada ~20 s</p>
-  ${htmlBotonCambiar}
+<body style="font-family:sans-serif;margin:0;background:#f8fafc">
+  ${htmlNav('estado')}
+  <div style="text-align:center;padding:40px 20px">
+    <h1>📱 Escanea el QR con WhatsApp</h1>
+    <p style="color:#555">WhatsApp → Dispositivos vinculados → Vincular dispositivo</p>
+    <img src="${qrDataUrl}" style="width:280px;border:1px solid #ddd;border-radius:12px;padding:12px">
+    <p style="color:#aaa;font-size:13px">Se recarga cada 30 s · El QR expira cada ~20 s</p>
+    ${htmlBotonCambiar}
+  </div>
 </body></html>`);
 });
 
@@ -251,6 +445,22 @@ client.on('disconnected', (reason) => {
 // =============================================
 
 /**
+ * Envía el mensaje de recordatorio a una sola cita
+ */
+async function enviarMensajeACita(cita) {
+  const numberId = await client.getNumberId(cita.telefono);
+  if (!numberId) {
+    await actualizarConfirmacion(cita.rowIndex, 'NUMERO_INVALIDO');
+    throw new Error(`Número no encontrado en WhatsApp: ${cita.telefono}`);
+  }
+  const whatsappId = `${cita.telefono}@c.us`;
+  await client.sendMessage(whatsappId, getMensajeCita(cita));
+  await marcarComoEnviado(cita.rowIndex);
+  citasPendientes.set(whatsappId, cita);
+  console.log(`   ✉️  Mensaje enviado a ${cita.nombre} (${cita.telefono})`);
+}
+
+/**
  * Carga en memoria las citas que ya tienen estado ENVIADO
  * (para continuar manejando respuestas si el bot se reinicia)
  */
@@ -299,31 +509,10 @@ async function enviarRecordatorios() {
         continue;
       }
 
-      const whatsappId = `${cita.telefono}@c.us`;
-      const mensaje = getMensajeCita(cita);
-
       try {
-        // Verificar que el número existe en WhatsApp
-        const numberId = await client.getNumberId(cita.telefono);
-
-        if (!numberId) {
-          console.log(`   ⚠️  Número no encontrado en WhatsApp: ${cita.telefono} (${cita.nombre})`);
-          await actualizarConfirmacion(cita.rowIndex, 'NUMERO_INVALIDO');
-          continue;
-        }
-
-        await client.sendMessage(whatsappId, mensaje);
-        await marcarComoEnviado(cita.rowIndex);
-
-        // Guardar en memoria para manejar respuestas
-        citasPendientes.set(whatsappId, cita);
-
+        await enviarMensajeACita(cita);
         enviados++;
-        console.log(`   ✉️  Mensaje enviado a ${cita.nombre} (${cita.telefono})`);
-
-        // Esperar 2 segundos entre mensajes para evitar spam
         await sleep(2000);
-
       } catch (err) {
         console.error(`   ❌ Error enviando a ${cita.nombre}:`, err.message);
       }
