@@ -29,7 +29,7 @@ function getMensajeCita(cita) {
   return formatearMensaje(plantilla, {
     nombre: cita.nombre,
     dia: diaFormateado,
-    hora: cita.hora,
+    hora: formatearHora(cita.hora),
     servicio: cita.servicio,
   });
 }
@@ -46,7 +46,7 @@ function getMensajeConfirmacion(cita) {
   return formatearMensaje(plantilla, {
     nombre: cita.nombre,
     dia: diaFormateado,
-    hora: cita.hora,
+    hora: formatearHora(cita.hora),
     servicio: cita.servicio,
   });
 }
@@ -63,7 +63,7 @@ function getMensajeCancelacion(cita) {
   return formatearMensaje(plantilla, {
     nombre: cita.nombre,
     dia: diaFormateado,
-    hora: cita.hora,
+    hora: formatearHora(cita.hora),
     servicio: cita.servicio,
   });
 }
@@ -107,6 +107,24 @@ function interpretarRespuesta(texto) {
 }
 
 /**
+ * Convierte hora de formato 24h (HH:mm) a 12h (h:mm AM/PM)
+ * Si la hora ya viene en otro formato, la devuelve tal cual
+ */
+function formatearHora(horaStr) {
+  const match = String(horaStr || '').match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return horaStr;
+
+  let h = parseInt(match[1]);
+  const min = match[2];
+  const periodo = h >= 12 ? 'PM' : 'AM';
+
+  if (h === 0) h = 12;
+  else if (h > 12) h = h - 12;
+
+  return `${h}:${min} ${periodo}`;
+}
+
+/**
  * Parsea una fecha en formato DD/MM/YYYY
  */
 function parsearFecha(fechaStr) {
@@ -136,5 +154,6 @@ module.exports = {
   debeEnviarHoy,
   interpretarRespuesta,
   formatearFecha,
+  formatearHora,
   parsearFecha,
 };
