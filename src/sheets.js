@@ -105,14 +105,14 @@ async function verificarEstructura() {
 // WhatsApp Web.js necesita: 521XXXXXXXXXX@c.us
 // -----------------------------------------------
 function formatPhone(phone) {
+  const codigoPais = process.env.COUNTRY_CODE || '57';
   let clean = phone.toString().replace(/[\s\-\(\)\+]/g, '');
 
   if (clean.startsWith('0')) clean = clean.substring(1);
-  if (clean.length === 10) clean = '52' + clean;
 
-  // México: 52XXXXXXXXXX (12 dígitos) → 521XXXXXXXXXX
-  if (clean.startsWith('52') && clean.length === 12) {
-    clean = '521' + clean.substring(2);
+  // Si el número no trae código de país, agregarlo
+  if (!clean.startsWith(codigoPais)) {
+    clean = codigoPais + clean;
   }
 
   return clean;
