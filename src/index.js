@@ -145,7 +145,16 @@ textarea{resize:vertical}
   .page-center{padding:16px}
   .form-grid{grid-template-columns:1fr}
 }
+.footer{text-align:center;padding:28px 20px;font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:40px}
+.footer a{color:#64748b;text-decoration:none}
+.footer a:hover{color:#0f172a}
 </style>`;
+
+const htmlFooter = `<footer class="footer">
+  © ${new Date().getFullYear()} <a href="https://yfrua.com" target="_blank" rel="noopener">yfrua.com</a>
+  &nbsp;·&nbsp; Desarrollado por <strong>Yeferson Rua</strong>
+  &nbsp;·&nbsp; Todos los derechos reservados
+</footer>`;
 
 // ── Badges ────────────────────────────────────────────────────────────────────
 function badgeEstado(estado) {
@@ -218,7 +227,7 @@ function renderLogin(error = '') {
       <button type="submit" class="btn-in">Ingresar</button>
     </form>
   </div>
-</body></html>`;
+${htmlFooter}</body></html>`;
 }
 
 // ── Render: Admin Dashboard ───────────────────────────────────────────────────
@@ -254,7 +263,7 @@ function renderAdminDashboard(clientes) {
       <tbody>${filas}</tbody></table>
     </div>
   </div>
-</body></html>`;
+${htmlFooter}</body></html>`;
 }
 
 // ── Render: Admin Formulario Cliente ─────────────────────────────────────────
@@ -324,7 +333,7 @@ function renderAdminFormCliente(cliente, flash = '') {
       </div>
     </form>
   </div>
-</body></html>`;
+${htmlFooter}</body></html>`;
 }
 
 // ── Render: Cliente — Estado WhatsApp ─────────────────────────────────────────
@@ -345,7 +354,7 @@ function renderClienteEstado(cliente, inst) {
     <a href="/citas" class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:8px">📋 Ver citas</a>
     ${botonCambiar}
   </div></div>
-</body></html>`;
+${htmlFooter}</body></html>`;
 
   if (!inst?.qrDataUrl) return `<!DOCTYPE html><html lang="es"><head>
   <meta charset="utf-8"><title>${escHtml(cliente.nombre)} — Conectando</title>
@@ -358,7 +367,7 @@ function renderClienteEstado(cliente, inst) {
     <p style="color:#64748b;margin-bottom:24px">La página se actualizará en unos segundos.</p>
     ${botonCambiar}
   </div></div>
-</body></html>`;
+${htmlFooter}</body></html>`;
 
   return `<!DOCTYPE html><html lang="es"><head>
   <meta charset="utf-8"><title>${escHtml(cliente.nombre)} — Escanea QR</title>
@@ -374,7 +383,7 @@ function renderClienteEstado(cliente, inst) {
     <p style="color:#94a3b8;font-size:12px;margin-top:14px">Se recarga cada 30 s · El QR expira cada ~20 s</p>
     <div style="margin-top:16px">${botonCambiar}</div>
   </div></div>
-</body></html>`;
+${htmlFooter}</body></html>`;
 }
 
 // ── Render: Cliente — Citas ───────────────────────────────────────────────────
@@ -424,7 +433,7 @@ function renderClienteCitas(citas, cliente, inst) {
     </div>
     <p style="color:#94a3b8;font-size:12px;margin-top:10px">Se actualiza automáticamente cada 30 s</p>
   </div>
-</body></html>`;
+${htmlFooter}</body></html>`;
 }
 
 // ── Render: Cliente — Nueva Cita ──────────────────────────────────────────────
@@ -453,7 +462,7 @@ function renderClienteNuevaCita(cliente, flash = '') {
       </form>
     </div>
   </div>
-</body></html>`;
+${htmlFooter}</body></html>`;
 }
 
 // ── Render: Cliente — Importar ────────────────────────────────────────────────
@@ -488,7 +497,7 @@ María García,3001234567,25/04/2026,10:00,Corte de cabello</div>
       </form>
     </div>
   </div>
-</body></html>`;
+${htmlFooter}</body></html>`;
 }
 
 // ── Render: Cliente — Configuración ──────────────────────────────────────────
@@ -527,7 +536,7 @@ function renderClienteConfiguracion(cliente, flash = '') {
       <button type="submit" class="btn btn-primary">Guardar cambios</button>
     </form>
   </div>
-</body></html>`;
+${htmlFooter}</body></html>`;
 }
 
 // ── HTTP Server ───────────────────────────────────────────────────────────────
