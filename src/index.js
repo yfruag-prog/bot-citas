@@ -93,14 +93,17 @@ function parsearCSV(texto) {
 // ── CSS compartido ────────────────────────────────────────────────────────────
 const css = `<style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;color:#0f172a;line-height:1.5}
+/* Sticky-footer: body es columna, el contenido principal crece */
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;color:#0f172a;line-height:1.5;display:flex;flex-direction:column;min-height:100vh}
 a{color:inherit}
-.nav{background:#0f172a;padding:0 24px;display:flex;align-items:center;height:56px;gap:20px;position:sticky;top:0;z-index:10;flex-wrap:nowrap;overflow-x:auto}
+/* Nav */
+.nav{background:#0f172a;padding:0 24px;display:flex;align-items:center;height:56px;gap:20px;position:sticky;top:0;z-index:10;flex-wrap:nowrap;overflow-x:auto;flex-shrink:0}
 .nav-brand{color:#fff;font-weight:700;font-size:15px;white-space:nowrap}
 .nav-link{color:#94a3b8;text-decoration:none;font-size:14px;padding:18px 0;border-bottom:2px solid transparent;transition:color .15s;white-space:nowrap}
 .nav-link:hover{color:#e2e8f0}
 .nav-link.active{color:#fff;border-bottom-color:#3b82f6}
 .nav-end{margin-left:auto;flex-shrink:0}
+/* Botones */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;text-decoration:none;transition:filter .15s;white-space:nowrap}
 .btn:hover{filter:brightness(1.1)}
 .btn-primary{background:#3b82f6;color:#fff}
@@ -108,20 +111,25 @@ a{color:inherit}
 .btn-danger{background:#ef4444;color:#fff}
 .btn-ghost{background:transparent;color:#64748b;font-size:13px;padding:6px 0}
 .btn-sm{padding:6px 14px;font-size:13px}
-.container{max-width:980px;margin:0 auto;padding:28px 20px}
-.page-center{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:24px}
+/* Layout — flex:1 empuja el footer al fondo */
+.container{max-width:980px;margin:0 auto;padding:28px 20px;flex:1;width:100%}
+.page-center{display:flex;align-items:center;justify-content:center;flex:1;padding:24px}
+/* Tarjetas */
 .card{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap}
+/* Alertas */
 .alert{padding:12px 16px;border-radius:8px;font-size:14px;margin-bottom:16px}
 .alert-warn{background:#fef9c3;border:1px solid #fde047}
 .alert-ok{background:#dcfce7;border:1px solid #86efac;color:#15803d}
 .alert-err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c}
+/* Tabla */
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;font-size:14px;min-width:600px}
 thead tr{background:#f8fafc}
 th{padding:11px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
 td{padding:11px 14px;border-top:1px solid #f1f5f9;vertical-align:middle}
 tbody tr:hover td{background:#f8fafc}
+/* Formularios */
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 label{display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:5px}
 input,select,textarea{width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;outline:none;transition:border-color .2s;background:#fff;font-family:inherit}
@@ -129,6 +137,11 @@ input:focus,select:focus,textarea:focus{border-color:#3b82f6}
 textarea{resize:vertical}
 .field{display:flex;flex-direction:column}
 .field.full{grid-column:1/-1}
+/* Footer */
+.footer{text-align:center;padding:22px 20px;font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0;flex-shrink:0}
+.footer a{color:#64748b;text-decoration:none}
+.footer a:hover{color:#0f172a;text-decoration:underline}
+/* Responsive tabla → tarjetas */
 @media(max-width:680px){
   .tbl-wrap{overflow-x:visible}
   table,thead,tbody,th,td,tr{display:block}
@@ -145,9 +158,6 @@ textarea{resize:vertical}
   .page-center{padding:16px}
   .form-grid{grid-template-columns:1fr}
 }
-.footer{text-align:center;padding:28px 20px;font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:40px}
-.footer a{color:#64748b;text-decoration:none}
-.footer a:hover{color:#0f172a}
 </style>`;
 
 const htmlFooter = `<footer class="footer">
@@ -208,25 +218,39 @@ function renderLogin(error = '') {
   <meta charset="utf-8"><title>Bot Citas — Acceso</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">${css}
   <style>
-    body{display:flex;align-items:center;justify-content:center;min-height:100vh}
-    .box{background:#fff;border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.1)}
-    .box h1{font-size:22px;text-align:center;margin-bottom:4px}
-    .sub{color:#64748b;text-align:center;font-size:14px;margin-bottom:28px}
-    .btn-in{width:100%;padding:12px;background:#0f172a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:4px}
+    /* El <main> crece para empujar el footer al fondo */
+    .login-main{flex:1;display:flex;align-items:center;justify-content:center;padding:32px 16px}
+    .box{background:#fff;border-radius:16px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 4px 24px rgba(0,0,0,.1)}
+    .box-logo{font-size:40px;text-align:center;margin-bottom:8px}
+    .box h1{font-size:22px;font-weight:700;text-align:center;margin-bottom:4px}
+    .box .sub{color:#64748b;text-align:center;font-size:14px;margin-bottom:28px}
+    .btn-in{width:100%;padding:13px;background:#0f172a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:6px;transition:background .2s}
     .btn-in:hover{background:#1e293b}
-    @media(max-width:440px){.box{padding:28px 18px;border-radius:0;min-height:100vh;display:flex;flex-direction:column;justify-content:center}}
+    @media(max-width:480px){
+      .login-main{padding:20px 0;align-items:flex-start}
+      .box{border-radius:0;padding:32px 20px;box-shadow:none;border-bottom:1px solid #e2e8f0}
+    }
   </style>
 </head><body>
-  <div class="box">
-    <h1>🤖 Bot Citas</h1>
-    <p class="sub">Panel de administración</p>
-    ${error ? `<div class="alert alert-err">${escHtml(error)}</div>` : ''}
-    <form method="POST" action="/login">
-      <div class="field" style="margin-bottom:14px"><label>Usuario</label><input type="text" name="user" required autofocus autocomplete="username"></div>
-      <div class="field" style="margin-bottom:16px"><label>Contraseña</label><input type="password" name="pass" required autocomplete="current-password"></div>
-      <button type="submit" class="btn-in">Ingresar</button>
-    </form>
-  </div>
+  <main class="login-main">
+    <div class="box">
+      <div class="box-logo">🤖</div>
+      <h1>Bot Citas</h1>
+      <p class="sub">Panel de administración</p>
+      ${error ? `<div class="alert alert-err">${escHtml(error)}</div>` : ''}
+      <form method="POST" action="/login">
+        <div class="field" style="margin-bottom:14px">
+          <label for="lu">Usuario</label>
+          <input type="text" id="lu" name="user" required autofocus autocomplete="username">
+        </div>
+        <div class="field" style="margin-bottom:6px">
+          <label for="lp">Contraseña</label>
+          <input type="password" id="lp" name="pass" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn-in">Ingresar</button>
+      </form>
+    </div>
+  </main>
 ${htmlFooter}</body></html>`;
 }
 
