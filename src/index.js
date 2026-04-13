@@ -387,10 +387,16 @@ function renderClienteDashboard(cliente, inst, citas) {
     </div>
   </div>`).join('');
 
+  // Normalizar fechas a DD/MM/YYYY con ceros antes de serializar
+  function normFecha(f) {
+    const m = (f || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    return m ? `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}/${m[3]}` : (f || '');
+  }
+
   // Serializar citas para el calendario JS
   const citasJS = JSON.stringify(citas.map(c => ({
-    fecha: c.fecha, hora: c.hora, nombre: c.nombre,
-    servicio: c.servicio, estado: c.confirmacion || '',
+    fecha: normFecha(c.fecha), hora: c.hora || '', nombre: c.nombre || '',
+    servicio: c.servicio || '', estado: c.confirmacion || '',
   })));
 
   return `<!DOCTYPE html><html lang="es"><head>
@@ -1014,17 +1020,27 @@ function inicializarInstancia(clienteConfig) {
     inst.conectado = true; inst.qrDataUrl = null;
     console.log(`\n✅ [${id}] WhatsApp conectado`);
     const cfg = obtenerCliente(id); if (!cfg) return;
-    const sh  = crearSheetsInterface(cfg.googleScriptUrl, cfg.countryCode);
-    await sh.verificarEstructura().catch(() => {});
-    await cargarCitasPendientesInst(id, sh);
+    try {
+      const sh = crearSheetsInterface(cfg.googleScriptUrl, cfg.countryCode);
+      await sh.verificarEstructura().catch(() => {});
+      await cargarCitasPendientesInst(id, sh);
+    } catch (e) {
+      console.warn(`[${id}] Sin Google Sheet configurado — citasPendientes vacío:`, e.message);
+    }
     iniciarCron(id);
   });
 
   wa.on('message', async msg => {
-    if (msg.isGroupMsg || !msg.body?.trim()) return;
-    const cfg = obtenerCliente(id); if (!cfg) return;
-    const sh  = crearSheetsInterface(cfg.googleScriptUrl, cfg.countryCode);
-    await manejarMensaje(id, msg, cfg, sh);
+    try {
+      // Ignorar grupos y mensajes vacíos
+      if (msg.from.endsWith('@g.us') || !msg.body?.trim()) return;
+      const cfg = obtenerCliente(id); if (!cfg) return;
+      let sh = null;
+      try { sh = crearSheetsInterface(cfg.googleScriptUrl, cfg.countryCode); } catch {}
+      await manejarMensaje(id, msg, cfg, sh);
+    } catch (e) {
+      console.error(`[${id}] Error procesando mensaje:`, e.message);
+    }
   });
 
   wa.on('disconnected', reason => {
@@ -1116,18 +1132,33 @@ async function manejarMensaje(clienteId, msg, cfg, sh) {
   const inst = instancias.get(clienteId); if (!inst) return;
   const texto = msg.body.trim();
   console.log(`[${clienteId}] 📩 ${msg.from}: "${texto}"`);
+
   const cita = inst.citasPendientes.get(msg.from);
-  if (!cita) { console.log(`[${clienteId}] ℹ️ Sin cita pendiente para ${msg.from}`); return; }
+  if (!cita) {
+    console.log(`[${clienteId}] ℹ️ Sin cita pendiente para: ${msg.from}`);
+    if (inst.citasPendientes.size > 0) {
+      console.log(`[${clienteId}] 📋 IDs en espera: ${[...inst.citasPendientes.keys()].join(' | ')}`);
+    }
+    return;
+  }
+
   const m   = crearMensajesInterface(cfg);
   const int = interpretarRespuesta(texto);
+
+  async function actualizarSheet(rowIndex, estado) {
+    if (!sh) { console.warn(`[${clienteId}] Sin Sheets — no se actualizó fila ${rowIndex}`); return; }
+    try { await sh.actualizarConfirmacion(rowIndex, estado); }
+    catch (e) { console.error(`[${clienteId}] Error actualizando Sheet:`, e.message); }
+  }
+
   if (int === 'CONFIRMAR') {
     await inst.client.sendMessage(msg.from, m.getMensajeConfirmacion(cita));
-    await sh.actualizarConfirmacion(cita.rowIndex, 'CONFIRMADO');
+    await actualizarSheet(cita.rowIndex, 'CONFIRMADO');
     inst.citasPendientes.delete(msg.from);
     console.log(`[${clienteId}] ✅ Confirmada: ${cita.nombre}`);
   } else if (int === 'CANCELAR') {
     await inst.client.sendMessage(msg.from, m.getMensajeCancelacion(cita));
-    await sh.actualizarConfirmacion(cita.rowIndex, 'CANCELADO');
+    await actualizarSheet(cita.rowIndex, 'CANCELADO');
     inst.citasPendientes.delete(msg.from);
     console.log(`[${clienteId}] ❌ Cancelada: ${cita.nombre}`);
   } else {
