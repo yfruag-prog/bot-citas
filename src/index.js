@@ -360,25 +360,252 @@ function renderAdminFormCliente(cliente, flash = '') {
 ${htmlFooter}</body></html>`;
 }
 
-// ── Render: Cliente — Estado WhatsApp ─────────────────────────────────────────
+// ── Helper: parsea DD/MM/YYYY a número comparable para ordenar ───────────────
+function fechaSort(fechaStr) {
+  const m = (fechaStr || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return 99999999;
+  return parseInt(`${m[3]}${m[2].padStart(2,'0')}${m[1].padStart(2,'0')}`);
+}
+
+// ── Render: Cliente — Dashboard con Calendario ────────────────────────────────
+function renderClienteDashboard(cliente, inst, citas) {
+  const hoy     = new Date();
+  const hoyStr  = `${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
+  const citasHoy   = citas.filter(c => c.fecha === hoyStr);
+  const pendientes = citas.filter(c => !c.confirmacion || c.confirmacion === '');
+
+  // Estadísticas rápidas
+  const stats = [
+    { label:'Total citas',  valor: citas.length,      color:'#3b82f6', bg:'#eff6ff', icon:'📋' },
+    { label:'Hoy',          valor: citasHoy.length,    color:'#8b5cf6', bg:'#f5f3ff', icon:'📅' },
+    { label:'Pendientes',   valor: pendientes.length,  color:'#f59e0b', bg:'#fffbeb', icon:'⏳' },
+  ].map(s => `<div class="card" style="padding:18px 20px;display:flex;align-items:center;gap:14px;flex:1;min-width:130px">
+    <div style="font-size:28px;line-height:1">${s.icon}</div>
+    <div>
+      <div style="font-size:26px;font-weight:800;color:${s.color};line-height:1">${s.valor}</div>
+      <div style="font-size:12px;color:#64748b;margin-top:2px">${s.label}</div>
+    </div>
+  </div>`).join('');
+
+  // Serializar citas para el calendario JS
+  const citasJS = JSON.stringify(citas.map(c => ({
+    fecha: c.fecha, hora: c.hora, nombre: c.nombre,
+    servicio: c.servicio, estado: c.confirmacion || '',
+  })));
+
+  return `<!DOCTYPE html><html lang="es"><head>
+  <meta charset="utf-8"><title>${escHtml(cliente.nombre)} — Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="refresh" content="60">${css}
+  <style>
+    /* Estado WA compacto */
+    .wa-bar{display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:12px 18px;box-shadow:0 1px 4px rgba(0,0,0,.07);flex-wrap:wrap;margin-bottom:20px}
+    .wa-dot{width:10px;height:10px;border-radius:50%;background:#16a34a;flex-shrink:0;box-shadow:0 0 0 3px #dcfce7}
+    /* Calendario */
+    .cal-wrap{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;margin-top:20px}
+    .cal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f1f5f9}
+    .cal-title{font-size:17px;font-weight:700;text-transform:capitalize;color:#0f172a}
+    .cal-nav{background:none;border:none;cursor:pointer;padding:6px 12px;border-radius:8px;font-size:18px;color:#475569;transition:background .15s}
+    .cal-nav:hover{background:#f1f5f9}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr)}
+    .cal-dn{text-align:center;padding:10px 2px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;background:#f8fafc;border-bottom:1px solid #f1f5f9}
+    .cal-day{min-height:90px;padding:6px 6px 4px;border-top:1px solid #f1f5f9;border-right:1px solid #f1f5f9;cursor:default;transition:background .1s}
+    .cal-day:nth-child(7n){border-right:none}
+    .cal-day.empty{background:#fafafa}
+    .cal-day.has-ev{background:#f8fbff}
+    .cal-day.today .cal-num{background:#3b82f6;color:#fff;border-radius:50%}
+    .cal-day.past{opacity:.55}
+    .cal-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;font-size:13px;font-weight:600;color:#374151}
+    .cal-ev{font-size:11px;border-radius:4px;padding:2px 6px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+    .cal-ev.pendiente{background:#dbeafe;color:#1d4ed8}
+    .cal-ev.enviado{background:#e0e7ff;color:#4338ca}
+    .cal-ev.confirmado{background:#dcfce7;color:#15803d}
+    .cal-ev.cancelado{background:#fee2e2;color:#b91c1c}
+    .cal-more{font-size:10px;color:#94a3b8;margin-top:2px;padding-left:4px}
+    /* Móvil: ocultar pills, mostrar puntos de color */
+    .cal-dots{display:none;gap:3px;flex-wrap:wrap;padding:4px 2px}
+    .cal-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+    @media(max-width:640px){
+      .cal-day{min-height:56px;padding:4px}
+      .cal-num{width:22px;height:22px;font-size:12px}
+      .cal-ev{display:none}
+      .cal-more{display:none}
+      .cal-dots{display:flex}
+    }
+    /* Lista citas del día (panel lateral / bajo el calendario en móvil) */
+    .day-panel{margin-top:20px}
+    .day-panel h2{font-size:15px;font-weight:700;margin-bottom:12px;color:#374151}
+    .day-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f1f5f9}
+    .day-item:last-child{border-bottom:none}
+    .day-hour{font-size:13px;font-weight:700;color:#3b82f6;min-width:50px}
+    .day-info{flex:1;min-width:0}
+    .day-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .day-svc{font-size:12px;color:#64748b}
+  </style>
+</head><body>${navCliente('estado',cliente.nombre)}
+  <div class="container">
+    <!-- Barra estado WA -->
+    <div class="wa-bar">
+      <span class="wa-dot"></span>
+      <span style="font-size:14px;font-weight:600;color:#15803d">WhatsApp conectado</span>
+      <span style="color:#94a3b8;font-size:13px;margin-left:4px">· El bot está activo</span>
+      <form method="POST" action="/cambiar-numero" style="margin-left:auto"
+            onsubmit="return confirm('¿Desconectar número y vincular uno nuevo?')">
+        <button class="btn btn-danger btn-sm">🔄 Cambiar número</button>
+      </form>
+    </div>
+    <!-- Stats -->
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:4px">${stats}</div>
+    <!-- Calendario -->
+    <div class="cal-wrap">
+      <div class="cal-head">
+        <button class="cal-nav" onclick="cambiarMes(-1)">&#8249;</button>
+        <span class="cal-title" id="cal-titulo"></span>
+        <button class="cal-nav" onclick="cambiarMes(1)">&#8250;</button>
+      </div>
+      <div class="cal-grid" id="cal-nombres">
+        ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div class="cal-dn">${d}</div>`).join('')}
+      </div>
+      <div class="cal-grid" id="cal-celdas"></div>
+    </div>
+    <!-- Panel citas del día seleccionado -->
+    <div class="day-panel card" id="day-panel" style="display:none;padding:0;overflow:hidden">
+      <div style="padding:14px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+        <h2 id="day-panel-title" style="font-size:15px;font-weight:700;margin:0"></h2>
+        <button onclick="document.getElementById('day-panel').style.display='none'" class="btn-ghost btn" style="font-size:18px;padding:0 4px;line-height:1">×</button>
+      </div>
+      <div id="day-panel-list"></div>
+    </div>
+  </div>
+  <script>
+    const CITAS = ${citasJS};
+    const HOY   = new Date();
+    let mes = HOY.getMonth(), anio = HOY.getFullYear();
+
+    function fechaKey(d,m,a){ return String(d).padStart(2,'0')+'/'+String(m+1).padStart(2,'0')+'/'+a; }
+
+    function claseEv(estado){
+      const e = (estado||'').toUpperCase();
+      if(e==='CONFIRMADO') return 'confirmado';
+      if(e==='CANCELADO')  return 'cancelado';
+      if(e==='ENVIADO')    return 'enviado';
+      return 'pendiente';
+    }
+    const colEv = {'pendiente':'#3b82f6','enviado':'#818cf8','confirmado':'#16a34a','cancelado':'#ef4444'};
+
+    function renderCal(){
+      const hoy1 = new Date(HOY.getFullYear(),HOY.getMonth(),HOY.getDate());
+      const titulo = new Date(anio,mes,1).toLocaleDateString('es',{month:'long',year:'numeric'});
+      document.getElementById('cal-titulo').textContent = titulo.charAt(0).toUpperCase()+titulo.slice(1);
+
+      const primer = new Date(anio,mes,1).getDay(); // 0=Dom
+      const offset = primer===0 ? 6 : primer-1;     // Lunes=0
+      const diasMes = new Date(anio,mes+1,0).getDate();
+
+      const grid = document.getElementById('cal-celdas');
+      grid.innerHTML = '';
+
+      // Celdas vacías al inicio
+      for(let i=0;i<offset;i++){
+        const el=document.createElement('div'); el.className='cal-day empty'; grid.appendChild(el);
+      }
+
+      for(let d=1;d<=diasMes;d++){
+        const fk = fechaKey(d,mes,anio);
+        const citasDia = CITAS.filter(c=>c.fecha===fk);
+        const diaDate  = new Date(anio,mes,d);
+        const esPasado = diaDate < hoy1;
+        const esHoy    = diaDate.getTime()===hoy1.getTime();
+
+        const el = document.createElement('div');
+        el.className = 'cal-day'
+          + (citasDia.length?  ' has-ev':'')
+          + (esHoy?  ' today':'')
+          + (esPasado && !esHoy? ' past':'');
+
+        // Número del día
+        const num = document.createElement('span');
+        num.className='cal-num'; num.textContent=d; el.appendChild(num);
+
+        // Pills (desktop)
+        const max=3;
+        citasDia.slice(0,max).forEach(c=>{
+          const ev=document.createElement('span');
+          ev.className='cal-ev '+claseEv(c.estado);
+          ev.textContent=c.hora+' '+c.nombre;
+          ev.title=c.nombre+' — '+c.servicio+' ('+c.hora+')';
+          el.appendChild(ev);
+        });
+        if(citasDia.length>max){
+          const more=document.createElement('span');
+          more.className='cal-more';
+          more.textContent='+'+( citasDia.length-max)+' más';
+          el.appendChild(more);
+        }
+
+        // Puntos de color (móvil)
+        if(citasDia.length){
+          const dots=document.createElement('div'); dots.className='cal-dots';
+          citasDia.slice(0,5).forEach(c=>{
+            const dot=document.createElement('span');
+            dot.className='cal-dot';
+            dot.style.background=colEv[claseEv(c.estado)];
+            dots.appendChild(dot);
+          });
+          el.appendChild(dots);
+        }
+
+        // Click → mostrar panel lateral
+        if(citasDia.length){
+          el.style.cursor='pointer';
+          el.addEventListener('click',()=>mostrarPanel(fk,citasDia));
+        }
+
+        grid.appendChild(el);
+      }
+    }
+
+    function mostrarPanel(fecha,citas){
+      const panel = document.getElementById('day-panel');
+      const titulo= document.getElementById('day-panel-title');
+      const lista = document.getElementById('day-panel-list');
+      const [d,m,a]=fecha.split('/');
+      const fechaLarga=new Date(a,m-1,d).toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'});
+      titulo.textContent=fechaLarga.charAt(0).toUpperCase()+fechaLarga.slice(1);
+      const sorted=[...citas].sort((a,b)=>a.hora.localeCompare(b.hora));
+      lista.innerHTML=sorted.map(c=>\`<div class="day-item">
+        <span class="day-hour">\${c.hora}</span>
+        <div class="day-info">
+          <div class="day-name">\${c.nombre}</div>
+          <div class="day-svc">\${c.servicio}</div>
+        </div>
+        <span class="badge" style="background:\${{'pendiente':'#dbeafe','enviado':'#e0e7ff','confirmado':'#dcfce7','cancelado':'#fee2e2'}[claseEv(c.estado)]};color:\${{'pendiente':'#1d4ed8','enviado':'#4338ca','confirmado':'#15803d','cancelado':'#b91c1c'}[claseEv(c.estado)]}">
+          \${{'pendiente':'Sin enviar','enviado':'Esperando','confirmado':'Confirmado ✓','cancelado':'Cancelado'}[claseEv(c.estado)]}
+        </span>
+      </div>\`).join('');
+      panel.style.display='block';
+      panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }
+
+    function cambiarMes(delta){
+      mes+=delta;
+      if(mes<0){mes=11;anio--;}
+      if(mes>11){mes=0;anio++;}
+      document.getElementById('day-panel').style.display='none';
+      renderCal();
+    }
+
+    renderCal();
+  </script>
+${htmlFooter}</body></html>`;
+}
+
+// ── Render: Cliente — Estado WhatsApp (QR / Cargando) ────────────────────────
 function renderClienteEstado(cliente, inst) {
   const botonCambiar = `<form method="POST" action="/cambiar-numero" style="margin-top:10px"
       onsubmit="return confirm('¿Desconectar número actual y vincular uno nuevo?')">
     <button class="btn btn-danger" style="width:100%;justify-content:center">🔄 Cambiar número</button>
   </form>`;
-
-  if (inst?.conectado) return `<!DOCTYPE html><html lang="es"><head>
-  <meta charset="utf-8"><title>${escHtml(cliente.nombre)}</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">${css}
-</head><body>${navCliente('estado',cliente.nombre)}
-  <div class="page-center"><div class="card" style="padding:40px 32px;text-align:center;max-width:420px;width:100%">
-    <div style="font-size:48px;margin-bottom:12px">✅</div>
-    <h1 style="font-size:22px;color:#16a34a;margin-bottom:8px">WhatsApp Conectado</h1>
-    <p style="color:#64748b;margin-bottom:24px">El bot está activo y funcionando.</p>
-    <a href="/citas" class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:8px">📋 Ver citas</a>
-    ${botonCambiar}
-  </div></div>
-${htmlFooter}</body></html>`;
 
   if (!inst?.qrDataUrl) return `<!DOCTYPE html><html lang="es"><head>
   <meta charset="utf-8"><title>${escHtml(cliente.nombre)} — Conectando</title>
@@ -412,6 +639,13 @@ ${htmlFooter}</body></html>`;
 
 // ── Render: Cliente — Citas ───────────────────────────────────────────────────
 function renderClienteCitas(citas, cliente, inst) {
+  // Ordenar ascendente: fecha más cercana primero, luego por hora
+  const sorted = [...citas].sort((a, b) => {
+    const df = fechaSort(a.fecha) - fechaSort(b.fecha);
+    return df !== 0 ? df : (a.hora || '').localeCompare(b.hora || '');
+  });
+  citas = sorted;
+
   const conectado = inst?.conectado;
   const pend = citas.filter(c => !c.confirmacion || c.confirmacion === '').length;
   const filas = citas.length === 0
@@ -661,7 +895,15 @@ async function handleCliente(req, res, url, flash, cliente) {
   const inst   = instancias.get(cliente.id);
   const sheets = () => crearSheetsInterface(cliente.googleScriptUrl, cliente.countryCode);
 
-  if (url === '/' && req.method === 'GET') { html(res, renderClienteEstado(cliente, inst)); return; }
+  if (url === '/' && req.method === 'GET') {
+    if (inst?.conectado) {
+      try { html(res, renderClienteDashboard(cliente, inst, await sheets().getCitas())); }
+      catch { html(res, renderClienteDashboard(cliente, inst, [])); }
+    } else {
+      html(res, renderClienteEstado(cliente, inst));
+    }
+    return;
+  }
 
   if (url === '/citas' && req.method === 'GET') {
     try { html(res, renderClienteCitas(await sheets().getCitas(), cliente, inst)); }
