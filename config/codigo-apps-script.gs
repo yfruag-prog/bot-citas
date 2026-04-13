@@ -68,9 +68,15 @@ function getCitas() {
         fecha = String(fecha || '');
       }
 
-      // Formatear hora si Sheets la devuelve como objeto Date
+      // Formatear hora — Sheets puede devolver un Date o un número (fracción del día)
       if (hora instanceof Date && !isNaN(hora)) {
         hora = Utilities.formatDate(hora, Session.getScriptTimeZone(), 'HH:mm');
+      } else if (typeof hora === 'number') {
+        // Fracción de día: 0.625 = 15:00
+        var totalMin = Math.round(hora * 24 * 60);
+        var hh = Math.floor(totalMin / 60) % 24;
+        var mm = totalMin % 60;
+        hora = (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
       } else {
         hora = String(hora || '');
       }

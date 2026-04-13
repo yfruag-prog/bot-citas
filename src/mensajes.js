@@ -107,21 +107,41 @@ function interpretarRespuesta(texto) {
 }
 
 /**
- * Convierte hora de formato 24h (HH:mm) a 12h (h:mm AM/PM)
- * Si la hora ya viene en otro formato, la devuelve tal cual
+ * Convierte hora a formato 12h (h:mm AM/PM).
+ * Maneja tres casos:
+ *  1. "15:00" o "9:30"  → formato 24h normal del Apps Script
+ *  2. "Sat Dec 30 1899 15:00:00 GMT-0500..." → Date.toString() que envía Sheets
+ *  3. "3:00 PM" → ya está en 12h, se deja igual
  */
 function formatearHora(horaStr) {
-  const match = String(horaStr || '').match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return horaStr;
+  const str = String(horaStr || '').trim();
 
-  let h = parseInt(match[1]);
-  const min = match[2];
-  const periodo = h >= 12 ? 'PM' : 'AM';
+  // Caso 3: ya tiene AM/PM
+  if (/AM|PM/i.test(str)) return str;
 
-  if (h === 0) h = 12;
-  else if (h > 12) h = h - 12;
+  // Caso 1: formato HH:mm o H:mm (inicio del string)
+  const matchCorto = str.match(/^(\d{1,2}):(\d{2})/);
+  if (matchCorto) {
+    let h = parseInt(matchCorto[1]);
+    const min = matchCorto[2];
+    const periodo = h >= 12 ? 'PM' : 'AM';
+    if (h === 0) h = 12;
+    else if (h > 12) h = h - 12;
+    return `${h}:${min} ${periodo}`;
+  }
 
-  return `${h}:${min} ${periodo}`;
+  // Caso 2: Date.toString() → extraer HH:MM:SS del string completo
+  const matchDate = str.match(/(\d{2}):(\d{2}):\d{2}/);
+  if (matchDate) {
+    let h = parseInt(matchDate[1]);
+    const min = matchDate[2];
+    const periodo = h >= 12 ? 'PM' : 'AM';
+    if (h === 0) h = 12;
+    else if (h > 12) h = h - 12;
+    return `${h}:${min} ${periodo}`;
+  }
+
+  return str;
 }
 
 /**

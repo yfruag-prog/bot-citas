@@ -6,6 +6,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const QRCode = require('qrcode');
 const http = require('http');
+const crypto = require('crypto');
 const cron = require('node-cron');
 const moment = require('moment-timezone');
 
@@ -31,6 +32,77 @@ const citasPendientes = new Map();
 
 let qrDataUrl = null;   // QR como imagen base64
 let botConectado = false;
+
+// ── Sesiones ──────────────────────────────────────────────────────────────
+
+const sesiones = new Map(); // token → expiry timestamp
+
+function crearSesion() {
+  const token = crypto.randomBytes(32).toString('hex');
+  sesiones.set(token, Date.now() + 8 * 60 * 60 * 1000); // 8 horas
+  return token;
+}
+
+function sesionValida(req) {
+  const token = parseCookies(req).session;
+  if (!token) return false;
+  const expiry = sesiones.get(token);
+  if (!expiry || Date.now() > expiry) { sesiones.delete(token); return false; }
+  return true;
+}
+
+function parseCookies(req) {
+  const cookies = {};
+  (req.headers.cookie || '').split(';').forEach(par => {
+    const [k, ...v] = par.trim().split('=');
+    if (k) cookies[k.trim()] = v.join('=').trim();
+  });
+  return cookies;
+}
+
+function credencialesValidas(user, pass) {
+  const u = process.env.PANEL_USER     || 'admin';
+  const p = process.env.PANEL_PASSWORD || 'admin123';
+  // Comparación en tiempo constante para evitar timing attacks
+  try {
+    const okU = crypto.timingSafeEqual(Buffer.from(user), Buffer.from(u));
+    const okP = crypto.timingSafeEqual(Buffer.from(pass), Buffer.from(p));
+    return okU && okP;
+  } catch { return false; }
+}
+
+function renderLogin(error = '') {
+  return `<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8">
+  <title>Bot Citas - Acceso</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body style="font-family:sans-serif;margin:0;background:#f8fafc;
+             display:flex;align-items:center;justify-content:center;min-height:100vh">
+  <div style="background:#fff;padding:40px;border-radius:12px;
+              box-shadow:0 2px 8px rgba(0,0,0,.1);width:100%;max-width:360px">
+    <h1 style="margin:0 0 6px;font-size:22px;text-align:center">🤖 Bot Citas</h1>
+    <p style="color:#64748b;text-align:center;margin:0 0 28px;font-size:14px">Panel de administración</p>
+    ${error ? `<p style="background:#fee2e2;color:#b91c1c;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px">${error}</p>` : ''}
+    <form method="POST" action="/login">
+      <label style="font-size:13px;color:#475569;font-weight:600">Usuario</label>
+      <input type="text" name="user" required autofocus
+        style="display:block;width:100%;box-sizing:border-box;margin:6px 0 16px;
+               padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:15px">
+      <label style="font-size:13px;color:#475569;font-weight:600">Contraseña</label>
+      <input type="password" name="pass" required
+        style="display:block;width:100%;box-sizing:border-box;margin:6px 0 24px;
+               padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:15px">
+      <button type="submit"
+        style="width:100%;background:#1e293b;color:#fff;border:none;padding:12px;
+               border-radius:8px;font-size:15px;cursor:pointer">
+        Ingresar
+      </button>
+    </form>
+  </div>
+</body></html>`;
+}
 
 // ── Helpers del servidor web ──────────────────────────────────────────────
 
@@ -65,6 +137,10 @@ function htmlNav(activa) {
   <span style="color:#fff;font-weight:700">🤖 Bot Citas</span>
   <a href="/" style="color:${activa === 'estado' ? '#fff' : '#94a3b8'};text-decoration:none;font-size:14px">Estado</a>
   <a href="/citas" style="color:${activa === 'citas' ? '#fff' : '#94a3b8'};text-decoration:none;font-size:14px">Citas</a>
+  <form method="POST" action="/logout" style="margin-left:auto">
+    <button type="submit" style="background:transparent;color:#64748b;border:none;
+            font-size:13px;cursor:pointer;padding:0">Cerrar sesión</button>
+  </form>
 </nav>`;
 }
 
@@ -166,6 +242,49 @@ function renderCitasPage(citas) {
 }
 
 const servidorQR = http.createServer(async (req, res) => {
+  // ── GET /login ────────────────────────────────────────────────────────────
+  if (req.url === '/login' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderLogin());
+    return;
+  }
+
+  // ── POST /login ───────────────────────────────────────────────────────────
+  if (req.url === '/login' && req.method === 'POST') {
+    const { user = '', pass = '' } = await parsearBody(req);
+    if (credencialesValidas(user, pass)) {
+      const token = crearSesion();
+      res.writeHead(302, {
+        'Location': '/',
+        'Set-Cookie': `session=${token}; HttpOnly; Path=/; Max-Age=28800`,
+      });
+    } else {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(renderLogin('Usuario o contraseña incorrectos'));
+    }
+    res.end();
+    return;
+  }
+
+  // ── POST /logout ──────────────────────────────────────────────────────────
+  if (req.url === '/logout' && req.method === 'POST') {
+    const token = parseCookies(req).session;
+    if (token) sesiones.delete(token);
+    res.writeHead(302, {
+      'Location': '/login',
+      'Set-Cookie': 'session=; HttpOnly; Path=/; Max-Age=0',
+    });
+    res.end();
+    return;
+  }
+
+  // ── Guard: requiere sesión activa ─────────────────────────────────────────
+  if (!sesionValida(req)) {
+    res.writeHead(302, { 'Location': '/login' });
+    res.end();
+    return;
+  }
+
   // ── POST /cambiar-numero ──────────────────────────────────────────────────
   if (req.method === 'POST' && req.url === '/cambiar-numero') {
     res.writeHead(302, { 'Location': '/' });
