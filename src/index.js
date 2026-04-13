@@ -71,34 +71,101 @@ function credencialesValidas(user, pass) {
   } catch { return false; }
 }
 
+// ── CSS compartido ────────────────────────────────────────────────────────
+const css = `<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;color:#0f172a;line-height:1.5}
+a{color:inherit}
+/* Nav */
+.nav{background:#0f172a;padding:0 24px;display:flex;align-items:center;height:56px;gap:20px;position:sticky;top:0;z-index:10}
+.nav-brand{color:#fff;font-weight:700;font-size:15px;white-space:nowrap}
+.nav-link{color:#94a3b8;text-decoration:none;font-size:14px;padding:18px 0;border-bottom:2px solid transparent;transition:color .15s}
+.nav-link:hover{color:#e2e8f0}
+.nav-link.active{color:#fff;border-bottom-color:#3b82f6}
+.nav-end{margin-left:auto}
+/* Botones */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;text-decoration:none;transition:filter .15s;white-space:nowrap}
+.btn:hover{filter:brightness(1.1)}
+.btn-primary{background:#3b82f6;color:#fff}
+.btn-success{background:#16a34a;color:#fff}
+.btn-danger{background:#ef4444;color:#fff}
+.btn-ghost{background:transparent;color:#64748b;font-size:13px;padding:6px 0}
+.btn-sm{padding:6px 14px;font-size:13px}
+/* Layout */
+.container{max-width:980px;margin:0 auto;padding:28px 20px}
+.page-center{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:24px}
+/* Card */
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+/* Badge */
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap}
+/* Alerta */
+.alert{padding:12px 16px;border-radius:8px;font-size:14px;margin-bottom:16px}
+.alert-warn{background:#fef9c3;border:1px solid #fde047}
+/* Tabla */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+thead tr{background:#f8fafc}
+th{padding:11px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+td{padding:11px 14px;border-top:1px solid #f1f5f9;vertical-align:middle}
+tbody tr:hover td{background:#f8fafc}
+/* Responsive tabla → tarjetas */
+@media(max-width:680px){
+  .tbl-wrap{overflow-x:visible}
+  table,thead,tbody,th,td,tr{display:block}
+  thead{display:none}
+  tbody tr{border:1px solid #e2e8f0;border-radius:10px;margin-bottom:10px;background:#fff;overflow:hidden}
+  tbody tr:hover td{background:#fff}
+  td{display:flex;align-items:center;padding:10px 14px;border-top:1px solid #f1f5f9;font-size:13px;gap:10px}
+  td:first-child{border-top:none}
+  td::before{content:attr(data-label);color:#94a3b8;font-size:11px;font-weight:700;min-width:80px;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0}
+}
+@media(max-width:600px){
+  .nav{padding:0 14px;gap:14px}
+  .container{padding:16px 14px}
+  .page-center{padding:16px}
+  .btn{padding:9px 16px}
+  .stack-mobile{flex-direction:column;align-items:stretch}
+  .stack-mobile .btn{justify-content:center}
+}
+</style>`;
+
 function renderLogin(error = '') {
   return `<!DOCTYPE html>
-<html><head>
+<html lang="es"><head>
   <meta charset="utf-8">
-  <title>Bot Citas - Acceso</title>
+  <title>Bot Citas — Acceso</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  ${css}
+  <style>
+    body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .login{background:#fff;border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.1)}
+    .login h1{font-size:22px;text-align:center;margin-bottom:4px}
+    .login .sub{color:#64748b;text-align:center;font-size:14px;margin-bottom:28px}
+    .field{margin-bottom:16px}
+    label{display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:6px}
+    input[type=text],input[type=password]{width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:15px;outline:none;transition:border-color .2s}
+    input:focus{border-color:#3b82f6}
+    .btn-login{width:100%;padding:12px;background:#0f172a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:4px;transition:background .2s}
+    .btn-login:hover{background:#1e293b}
+    .err{background:#fee2e2;color:#b91c1c;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px}
+    @media(max-width:440px){.login{padding:28px 18px;border-radius:0;min-height:100vh;justify-content:center;display:flex;flex-direction:column}}
+  </style>
 </head>
-<body style="font-family:sans-serif;margin:0;background:#f8fafc;
-             display:flex;align-items:center;justify-content:center;min-height:100vh">
-  <div style="background:#fff;padding:40px;border-radius:12px;
-              box-shadow:0 2px 8px rgba(0,0,0,.1);width:100%;max-width:360px">
-    <h1 style="margin:0 0 6px;font-size:22px;text-align:center">🤖 Bot Citas</h1>
-    <p style="color:#64748b;text-align:center;margin:0 0 28px;font-size:14px">Panel de administración</p>
-    ${error ? `<p style="background:#fee2e2;color:#b91c1c;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px">${error}</p>` : ''}
+<body>
+  <div class="login">
+    <h1>🤖 Bot Citas</h1>
+    <p class="sub">Panel de administración</p>
+    ${error ? `<div class="err">${escHtml(error)}</div>` : ''}
     <form method="POST" action="/login">
-      <label style="font-size:13px;color:#475569;font-weight:600">Usuario</label>
-      <input type="text" name="user" required autofocus
-        style="display:block;width:100%;box-sizing:border-box;margin:6px 0 16px;
-               padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:15px">
-      <label style="font-size:13px;color:#475569;font-weight:600">Contraseña</label>
-      <input type="password" name="pass" required
-        style="display:block;width:100%;box-sizing:border-box;margin:6px 0 24px;
-               padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:15px">
-      <button type="submit"
-        style="width:100%;background:#1e293b;color:#fff;border:none;padding:12px;
-               border-radius:8px;font-size:15px;cursor:pointer">
-        Ingresar
-      </button>
+      <div class="field">
+        <label for="u">Usuario</label>
+        <input type="text" id="u" name="user" required autofocus autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="p">Contraseña</label>
+        <input type="password" id="p" name="pass" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-login">Ingresar</button>
     </form>
   </div>
 </body></html>`;
@@ -129,17 +196,16 @@ function badgeEstado(estado) {
     'NUMERO_INVALIDO': ['#ffedd5','#c2410c','Número inválido'],
   };
   const [bg, color, label] = cfg[estado] || ['#e2e8f0','#475569', estado || 'Sin enviar'];
-  return `<span style="background:${bg};color:${color};padding:3px 10px;border-radius:999px;font-size:12px;white-space:nowrap">${label}</span>`;
+  return `<span class="badge" style="background:${bg};color:${color}">${label}</span>`;
 }
 
 function htmlNav(activa) {
-  return `<nav style="background:#1e293b;padding:12px 24px;display:flex;align-items:center;gap:24px">
-  <span style="color:#fff;font-weight:700">🤖 Bot Citas</span>
-  <a href="/" style="color:${activa === 'estado' ? '#fff' : '#94a3b8'};text-decoration:none;font-size:14px">Estado</a>
-  <a href="/citas" style="color:${activa === 'citas' ? '#fff' : '#94a3b8'};text-decoration:none;font-size:14px">Citas</a>
-  <form method="POST" action="/logout" style="margin-left:auto">
-    <button type="submit" style="background:transparent;color:#64748b;border:none;
-            font-size:13px;cursor:pointer;padding:0">Cerrar sesión</button>
+  return `<nav class="nav">
+  <span class="nav-brand">🤖 Bot Citas</span>
+  <a href="/" class="nav-link${activa === 'estado' ? ' active' : ''}">Estado</a>
+  <a href="/citas" class="nav-link${activa === 'citas' ? ' active' : ''}">Citas</a>
+  <form method="POST" action="/logout" class="nav-end" style="display:flex">
+    <button type="submit" class="btn btn-ghost">Cerrar sesión</button>
   </form>
 </nav>`;
 }
@@ -147,9 +213,7 @@ function htmlNav(activa) {
 const htmlBotonCambiar = `
   <form method="POST" action="/cambiar-numero" style="margin-top:20px"
         onsubmit="return confirm('¿Seguro que quieres desconectar el número actual y vincular uno nuevo?')">
-    <button type="submit"
-      style="background:#ef4444;color:#fff;border:none;padding:10px 24px;
-             font-size:14px;border-radius:8px;cursor:pointer">
+    <button type="submit" class="btn btn-danger">
       🔄 Cambiar número de WhatsApp
     </button>
   </form>`;
@@ -158,7 +222,7 @@ function renderCitasPage(citas) {
   const pendientesCount = citas.filter(c => !c.confirmacion || c.confirmacion === '').length;
 
   const filas = citas.length === 0
-    ? '<tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8">No hay citas registradas</td></tr>'
+    ? '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:32px">No hay citas registradas</td></tr>'
     : citas.map(cita => {
         const sinEnviar = !cita.confirmacion || cita.confirmacion === '';
         const btnEnviar = sinEnviar && botConectado
@@ -166,71 +230,66 @@ function renderCitasPage(citas) {
                <input type="hidden" name="rowIndex" value="${cita.rowIndex}">
                <button type="submit"
                  onclick="return confirm('¿Enviar mensaje a ${escHtml(cita.nombre)}?')"
-                 style="background:#2563eb;color:#fff;border:none;padding:5px 12px;
-                        border-radius:6px;cursor:pointer;font-size:13px">
+                 class="btn btn-primary btn-sm">
                  Enviar
                </button>
              </form>`
           : '';
-        return `<tr style="border-bottom:1px solid #f1f5f9">
-          <td style="padding:10px 12px">${escHtml(cita.nombre)}</td>
-          <td style="padding:10px 12px">${escHtml(cita.telefono)}</td>
-          <td style="padding:10px 12px;white-space:nowrap">${escHtml(cita.fecha)}</td>
-          <td style="padding:10px 12px">${escHtml(cita.hora)}</td>
-          <td style="padding:10px 12px">${escHtml(cita.servicio)}</td>
-          <td style="padding:10px 12px">${badgeEstado(cita.confirmacion)}</td>
-          <td style="padding:10px 12px">${btnEnviar}</td>
+        return `<tr>
+          <td data-label="Nombre">${escHtml(cita.nombre)}</td>
+          <td data-label="Teléfono">${escHtml(cita.telefono)}</td>
+          <td data-label="Fecha" style="white-space:nowrap">${escHtml(cita.fecha)}</td>
+          <td data-label="Hora">${escHtml(cita.hora)}</td>
+          <td data-label="Servicio">${escHtml(cita.servicio)}</td>
+          <td data-label="Estado">${badgeEstado(cita.confirmacion)}</td>
+          <td data-label="Acción">${btnEnviar}</td>
         </tr>`;
       }).join('');
 
   const alertaDesconectado = !botConectado
-    ? `<div style="background:#fef9c3;border:1px solid #fde047;padding:12px 16px;
-                   border-radius:8px;margin-bottom:16px">
+    ? `<div class="alert alert-warn">
          ⚠️ WhatsApp no está conectado — <a href="/">Conectar →</a>
        </div>`
     : '';
 
   const btnEnviarTodo = pendientesCount > 0 && botConectado
-    ? `<form method="POST" action="/enviar-todo" style="display:inline-block"
+    ? `<form method="POST" action="/enviar-todo"
            onsubmit="return confirm('¿Enviar mensaje a los ${pendientesCount} contacto(s) sin enviar?')">
-         <button type="submit"
-           style="background:#16a34a;color:#fff;border:none;padding:10px 22px;
-                  font-size:14px;border-radius:8px;cursor:pointer">
+         <button type="submit" class="btn btn-success">
            📤 Enviar a los ${pendientesCount} pendientes
          </button>
        </form>`
     : '';
 
   return `<!DOCTYPE html>
-<html><head>
+<html lang="es"><head>
   <meta charset="utf-8">
-  <title>Bot Citas - Citas</title>
+  <title>Bot Citas — Citas</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="refresh" content="30">
+  ${css}
 </head>
-<body style="font-family:sans-serif;margin:0;background:#f8fafc">
+<body>
   ${htmlNav('citas')}
-  <div style="max-width:960px;margin:0 auto;padding:24px">
-    <div style="display:flex;align-items:center;justify-content:space-between;
-                flex-wrap:wrap;gap:12px;margin-bottom:20px">
-      <h1 style="margin:0;font-size:20px">
-        📋 Citas <span style="color:#94a3b8;font-weight:normal">(${citas.length})</span>
+  <div class="container">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <h1 style="font-size:20px;font-weight:700">
+        📋 Citas <span style="color:#94a3b8;font-weight:400">(${citas.length})</span>
       </h1>
       ${btnEnviarTodo}
     </div>
     ${alertaDesconectado}
-    <div style="background:#fff;border-radius:10px;overflow:auto;
-                box-shadow:0 1px 3px rgba(0,0,0,.08)">
-      <table style="width:100%;border-collapse:collapse;font-size:14px;min-width:700px">
+    <div class="card tbl-wrap">
+      <table>
         <thead>
-          <tr style="background:#f1f5f9;text-align:left">
-            <th style="padding:12px">Nombre</th>
-            <th style="padding:12px">Teléfono</th>
-            <th style="padding:12px">Fecha</th>
-            <th style="padding:12px">Hora</th>
-            <th style="padding:12px">Servicio</th>
-            <th style="padding:12px">Estado</th>
-            <th style="padding:12px">Acción</th>
+          <tr>
+            <th>Nombre</th>
+            <th>Teléfono</th>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Servicio</th>
+            <th>Estado</th>
+            <th>Acción</th>
           </tr>
         </thead>
         <tbody>${filas}</tbody>
@@ -380,18 +439,24 @@ const servidorQR = http.createServer(async (req, res) => {
 
   if (botConectado) {
     res.end(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Bot WhatsApp</title></head>
-<body style="font-family:sans-serif;margin:0;background:#f8fafc">
+<html lang="es"><head>
+  <meta charset="utf-8">
+  <title>Bot Citas — Estado</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  ${css}
+</head>
+<body>
   ${htmlNav('estado')}
-  <div style="text-align:center;padding:60px 20px">
-    <h1 style="color:#22c55e">✅ WhatsApp Conectado</h1>
-    <p style="color:#64748b">El bot está activo y funcionando correctamente.</p>
-    <a href="/citas"
-       style="display:inline-block;padding:10px 22px;background:#2563eb;color:#fff;
-              border-radius:8px;text-decoration:none;font-size:15px">
-      📋 Ver citas
-    </a>
-    ${htmlBotonCambiar}
+  <div class="page-center">
+    <div class="card" style="padding:40px 32px;text-align:center;max-width:420px;width:100%">
+      <div style="font-size:48px;margin-bottom:12px">✅</div>
+      <h1 style="font-size:22px;color:#16a34a;margin-bottom:8px">WhatsApp Conectado</h1>
+      <p style="color:#64748b;margin-bottom:24px">El bot está activo y funcionando correctamente.</p>
+      <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+        <a href="/citas" class="btn btn-primary" style="width:100%;justify-content:center">📋 Ver citas</a>
+        ${htmlBotonCambiar}
+      </div>
+    </div>
   </div>
 </body></html>`);
     return;
@@ -399,35 +464,51 @@ const servidorQR = http.createServer(async (req, res) => {
 
   if (!qrDataUrl) {
     res.end(`<!DOCTYPE html>
-<html><head>
-  <meta charset="utf-8"><title>Bot WhatsApp - QR</title>
+<html lang="es"><head>
+  <meta charset="utf-8">
+  <title>Bot Citas — Conectando</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="refresh" content="5">
+  ${css}
 </head>
-<body style="font-family:sans-serif;margin:0;background:#f8fafc">
+<body>
   ${htmlNav('estado')}
-  <div style="text-align:center;padding:60px 20px">
-    <h2>⏳ Generando QR...</h2>
-    <p style="color:#64748b">La página se actualizará sola en unos segundos.</p>
-    ${htmlBotonCambiar}
+  <div class="page-center">
+    <div class="card" style="padding:40px 32px;text-align:center;max-width:420px;width:100%">
+      <div style="font-size:48px;margin-bottom:12px">⏳</div>
+      <h2 style="font-size:20px;margin-bottom:8px">Generando QR...</h2>
+      <p style="color:#64748b;margin-bottom:24px">La página se actualizará sola en unos segundos.</p>
+      ${htmlBotonCambiar}
+    </div>
   </div>
 </body></html>`);
     return;
   }
 
   res.end(`<!DOCTYPE html>
-<html><head>
+<html lang="es"><head>
   <meta charset="utf-8">
-  <title>Bot WhatsApp - Escanea el QR</title>
+  <title>Bot Citas — Escanea el QR</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="refresh" content="30">
+  ${css}
+  <style>
+    .qr-img{width:260px;max-width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#fff}
+  </style>
 </head>
-<body style="font-family:sans-serif;margin:0;background:#f8fafc">
+<body>
   ${htmlNav('estado')}
-  <div style="text-align:center;padding:40px 20px">
-    <h1>📱 Escanea el QR con WhatsApp</h1>
-    <p style="color:#555">WhatsApp → Dispositivos vinculados → Vincular dispositivo</p>
-    <img src="${qrDataUrl}" style="width:280px;border:1px solid #ddd;border-radius:12px;padding:12px">
-    <p style="color:#aaa;font-size:13px">Se recarga cada 30 s · El QR expira cada ~20 s</p>
-    ${htmlBotonCambiar}
+  <div class="page-center">
+    <div class="card" style="padding:36px 32px;text-align:center;max-width:420px;width:100%">
+      <div style="font-size:40px;margin-bottom:12px">📱</div>
+      <h1 style="font-size:20px;margin-bottom:6px">Escanea el QR con WhatsApp</h1>
+      <p style="color:#64748b;font-size:14px;margin-bottom:20px">
+        WhatsApp → Dispositivos vinculados → Vincular dispositivo
+      </p>
+      <img src="${qrDataUrl}" class="qr-img" alt="QR WhatsApp">
+      <p style="color:#94a3b8;font-size:12px;margin-top:14px">Se recarga cada 30 s · El QR expira cada ~20 s</p>
+      <div style="margin-top:16px">${htmlBotonCambiar}</div>
+    </div>
   </div>
 </body></html>`);
 });
