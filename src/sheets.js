@@ -118,10 +118,50 @@ function formatPhone(phone) {
   return clean;
 }
 
+// -----------------------------------------------
+// Agrega una sola cita nueva en Google Sheets
+// -----------------------------------------------
+async function agregarCita(cita) {
+  try {
+    const resultado = await llamarScript('POST', {
+      action: 'agregarCita',
+      nombre:   cita.nombre,
+      telefono: cita.telefono,
+      fecha:    cita.fecha,
+      hora:     cita.hora,
+      servicio: cita.servicio,
+    });
+    if (resultado.error) throw new Error(resultado.error);
+    return true;
+  } catch (error) {
+    console.error('❌ Error agregando cita:', error.message);
+    throw error;
+  }
+}
+
+// -----------------------------------------------
+// Agrega múltiples citas en bloque
+// -----------------------------------------------
+async function agregarCitas(citas) {
+  try {
+    const resultado = await llamarScript('POST', {
+      action: 'agregarCitas',
+      citas,
+    });
+    if (resultado.error) throw new Error(resultado.error);
+    return resultado.count || citas.length;
+  } catch (error) {
+    console.error('❌ Error importando citas:', error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   getCitas,
   actualizarConfirmacion,
   marcarComoEnviado,
   verificarEstructura,
+  agregarCita,
+  agregarCitas,
   formatPhone,
 };

@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const cron = require('node-cron');
 const moment = require('moment-timezone');
 
-const { getCitas, actualizarConfirmacion, marcarComoEnviado, verificarEstructura } = require('./sheets');
+const { getCitas, actualizarConfirmacion, marcarComoEnviado, verificarEstructura, agregarCita, agregarCitas } = require('./sheets');
 const {
   getMensajeCita,
   getMensajeConfirmacion,
@@ -204,6 +204,8 @@ function htmlNav(activa) {
   <span class="nav-brand">🤖 Bot Citas</span>
   <a href="/" class="nav-link${activa === 'estado' ? ' active' : ''}">Estado</a>
   <a href="/citas" class="nav-link${activa === 'citas' ? ' active' : ''}">Citas</a>
+  <a href="/nueva-cita" class="nav-link${activa === 'nueva-cita' ? ' active' : ''}">Nueva cita</a>
+  <a href="/importar" class="nav-link${activa === 'importar' ? ' active' : ''}">Importar</a>
   <form method="POST" action="/logout" class="nav-end" style="display:flex">
     <button type="submit" class="btn btn-ghost">Cerrar sesión</button>
   </form>
@@ -296,6 +298,172 @@ function renderCitasPage(citas) {
       </table>
     </div>
     <p style="color:#94a3b8;font-size:12px;margin-top:10px">Se actualiza automáticamente cada 30 s</p>
+  </div>
+</body></html>`;
+}
+
+// ── CSV parser (sin dependencias externas) ────────────────────────────────
+function parsearCSV(texto) {
+  const lineas = texto.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    .split('\n').map(l => l.trim()).filter(Boolean);
+  if (lineas.length < 2) return [];
+  // Ignora la primera línea (encabezado)
+  return lineas.slice(1).map(linea => {
+    // Separar por coma respetando comillas dobles
+    const cols = [];
+    let dentro = false, campo = '';
+    for (let i = 0; i < linea.length; i++) {
+      const ch = linea[i];
+      if (ch === '"') { dentro = !dentro; }
+      else if (ch === ',' && !dentro) { cols.push(campo.trim()); campo = ''; }
+      else { campo += ch; }
+    }
+    cols.push(campo.trim());
+    return {
+      nombre:   cols[0] || '',
+      telefono: cols[1] || '',
+      fecha:    cols[2] || '',
+      hora:     cols[3] || '',
+      servicio: cols[4] || '',
+    };
+  }).filter(c => c.nombre && c.telefono && c.fecha);
+}
+
+// ── Formulario nueva cita ─────────────────────────────────────────────────
+function renderNuevaCita(flash = '') {
+  const [tipo, msg] = flash ? flash.split('|') : [];
+  const alerta = msg
+    ? `<div class="alert ${tipo === 'ok' ? 'alert-ok' : 'alert-err'}">${escHtml(msg)}</div>`
+    : '';
+  return `<!DOCTYPE html>
+<html lang="es"><head>
+  <meta charset="utf-8">
+  <title>Bot Citas — Nueva cita</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  ${css}
+  <style>
+    .alert-ok{background:#dcfce7;border:1px solid #86efac;color:#15803d}
+    .alert-err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:560px){.form-grid{grid-template-columns:1fr}}
+    label{display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:5px}
+    input,select{width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:8px;
+                 font-size:14px;outline:none;transition:border-color .2s;background:#fff}
+    input:focus,select:focus{border-color:#3b82f6}
+    .field{display:flex;flex-direction:column}
+    .field.full{grid-column:1/-1}
+  </style>
+</head>
+<body>
+  ${htmlNav('nueva-cita')}
+  <div class="container" style="max-width:680px">
+    <h1 style="font-size:20px;font-weight:700;margin-bottom:20px">➕ Nueva cita</h1>
+    ${alerta}
+    <div class="card" style="padding:28px 24px">
+      <form method="POST" action="/nueva-cita">
+        <div class="form-grid">
+          <div class="field">
+            <label for="nc-nombre">Nombre completo *</label>
+            <input type="text" id="nc-nombre" name="nombre" required placeholder="Ej: María García">
+          </div>
+          <div class="field">
+            <label for="nc-tel">Teléfono *</label>
+            <input type="tel" id="nc-tel" name="telefono" required placeholder="Ej: 3001234567">
+          </div>
+          <div class="field">
+            <label for="nc-fecha">Fecha *</label>
+            <input type="text" id="nc-fecha" name="fecha" required placeholder="DD/MM/YYYY"
+                   pattern="\\d{1,2}/\\d{1,2}/\\d{4}" title="Formato: DD/MM/YYYY">
+          </div>
+          <div class="field">
+            <label for="nc-hora">Hora *</label>
+            <input type="time" id="nc-hora" name="hora" required>
+          </div>
+          <div class="field full">
+            <label for="nc-servicio">Servicio *</label>
+            <input type="text" id="nc-servicio" name="servicio" required placeholder="Ej: Corte de cabello">
+          </div>
+        </div>
+        <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap">
+          <button type="submit" class="btn btn-primary">Guardar cita</button>
+          <a href="/citas" class="btn btn-ghost">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</body></html>`;
+}
+
+// ── Importar CSV ──────────────────────────────────────────────────────────
+function renderImportar(flash = '') {
+  const [tipo, msg] = flash ? flash.split('|') : [];
+  const alerta = msg
+    ? `<div class="alert ${tipo === 'ok' ? 'alert-ok' : 'alert-err'}">${escHtml(msg)}</div>`
+    : '';
+  return `<!DOCTYPE html>
+<html lang="es"><head>
+  <meta charset="utf-8">
+  <title>Bot Citas — Importar</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  ${css}
+  <style>
+    .alert-ok{background:#dcfce7;border:1px solid #86efac;color:#15803d}
+    .alert-err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c}
+    label{display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:5px}
+    textarea{width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:8px;
+             font-size:13px;font-family:monospace;outline:none;resize:vertical;
+             transition:border-color .2s;background:#fff}
+    textarea:focus{border-color:#3b82f6}
+    .example{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;
+             padding:12px 14px;font-family:monospace;font-size:12px;
+             color:#475569;white-space:pre;overflow-x:auto}
+  </style>
+  <script>
+    function leerArchivo(e){
+      const f = e.target.files[0];
+      if(!f) return;
+      const r = new FileReader();
+      r.onload = ev => { document.getElementById('csv-data').value = ev.target.result; };
+      r.readAsText(f, 'UTF-8');
+    }
+  </script>
+</head>
+<body>
+  ${htmlNav('importar')}
+  <div class="container" style="max-width:720px">
+    <h1 style="font-size:20px;font-weight:700;margin-bottom:8px">📥 Importar citas desde CSV</h1>
+    <p style="color:#64748b;font-size:14px;margin-bottom:20px">
+      Descarga la plantilla, llénala y pégala aquí, o selecciona el archivo directamente.
+    </p>
+    ${alerta}
+    <div class="card" style="padding:28px 24px;margin-bottom:16px">
+      <div style="margin-bottom:18px">
+        <p style="font-size:13px;font-weight:600;color:#475569;margin-bottom:8px">Formato esperado (CSV):</p>
+        <div class="example">Nombre,Teléfono,Fecha,Hora,Servicio
+María García,3001234567,25/04/2026,10:00,Corte de cabello
+Carlos López,3109876543,25/04/2026,11:30,Consulta médica</div>
+        <a href="/plantilla.csv" class="btn btn-ghost btn-sm" style="margin-top:10px;display:inline-flex">
+          ⬇ Descargar plantilla
+        </a>
+      </div>
+      <form method="POST" action="/importar">
+        <div style="margin-bottom:14px">
+          <label for="csv-file">Seleccionar archivo CSV</label>
+          <input type="file" id="csv-file" accept=".csv,text/csv"
+                 onchange="leerArchivo(event)"
+                 style="width:100%;padding:8px 0;font-size:14px;border:none;background:transparent">
+        </div>
+        <div style="margin-bottom:18px">
+          <label for="csv-data">O pega el contenido CSV aquí</label>
+          <textarea id="csv-data" name="csv" rows="10"
+                    placeholder="Nombre,Teléfono,Fecha,Hora,Servicio&#10;María García,3001234567,25/04/2026,10:00,Corte de cabello"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button type="submit" class="btn btn-success">Importar citas</button>
+          <a href="/citas" class="btn btn-ghost">Cancelar</a>
+        </div>
+      </form>
+    </div>
   </div>
 </body></html>`;
 }
@@ -412,6 +580,75 @@ const servidorQR = http.createServer(async (req, res) => {
         console.error('Error en envío individual:', err.message);
       }
     }, 200);
+    return;
+  }
+
+  // ── GET /plantilla.csv ───────────────────────────────────────────────────
+  if (req.url === '/plantilla.csv') {
+    const plantilla = 'Nombre,Teléfono,Fecha,Hora,Servicio\r\nEjemplo Cliente,3001234567,25/04/2026,10:00,Corte de cabello\r\n';
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="plantilla-citas.csv"',
+    });
+    res.end('\uFEFF' + plantilla); // BOM para que Excel lo abra bien
+    return;
+  }
+
+  // ── GET /nueva-cita ───────────────────────────────────────────────────────
+  if (req.url.startsWith('/nueva-cita') && req.method === 'GET') {
+    const flash = new URLSearchParams(req.url.split('?')[1] || '').get('flash') || '';
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderNuevaCita(flash));
+    return;
+  }
+
+  // ── POST /nueva-cita ──────────────────────────────────────────────────────
+  if (req.url === '/nueva-cita' && req.method === 'POST') {
+    const { nombre = '', telefono = '', fecha = '', hora = '', servicio = '' } = await parsearBody(req);
+    if (!nombre || !telefono || !fecha || !hora || !servicio) {
+      res.writeHead(302, { 'Location': '/nueva-cita?flash=err|Todos los campos son obligatorios' });
+      res.end();
+      return;
+    }
+    try {
+      await agregarCita({ nombre, telefono, fecha, hora, servicio });
+      res.writeHead(302, { 'Location': `/nueva-cita?flash=ok|Cita de ${nombre} guardada correctamente` });
+    } catch (err) {
+      res.writeHead(302, { 'Location': `/nueva-cita?flash=err|Error al guardar: ${encodeURIComponent(err.message)}` });
+    }
+    res.end();
+    return;
+  }
+
+  // ── GET /importar ─────────────────────────────────────────────────────────
+  if (req.url.startsWith('/importar') && req.method === 'GET') {
+    const flash = new URLSearchParams(req.url.split('?')[1] || '').get('flash') || '';
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(renderImportar(flash));
+    return;
+  }
+
+  // ── POST /importar ────────────────────────────────────────────────────────
+  if (req.url === '/importar' && req.method === 'POST') {
+    const { csv = '' } = await parsearBody(req);
+    if (!csv.trim()) {
+      res.writeHead(302, { 'Location': '/importar?flash=err|No se recibió contenido CSV' });
+      res.end();
+      return;
+    }
+    const citas = parsearCSV(csv);
+    if (citas.length === 0) {
+      res.writeHead(302, { 'Location': '/importar?flash=err|No se encontraron filas válidas (verifica el formato)' });
+      res.end();
+      return;
+    }
+    try {
+      const total = await agregarCitas(citas);
+      res.writeHead(302, { 'Location': `/importar?flash=ok|${total} cita(s) importadas correctamente` });
+    } catch (err) {
+      res.writeHead(302, { 'Location': `/importar?flash=err|Error al importar: ${encodeURIComponent(err.message)}` });
+    }
+    res.end();
     return;
   }
 

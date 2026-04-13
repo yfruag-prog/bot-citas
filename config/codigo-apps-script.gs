@@ -35,6 +35,12 @@ function doPost(e) {
     if (action === 'actualizarConfirmacion') {
       return responder(actualizarConfirmacion(data.rowIndex, data.estado));
     }
+    if (action === 'agregarCita') {
+      return responder(agregarCita(data));
+    }
+    if (action === 'agregarCitas') {
+      return responder(agregarCitas(data.citas));
+    }
     return responder({ error: 'Acción no reconocida: ' + action });
   } catch (err) {
     return responder({ error: err.message });
@@ -114,6 +120,53 @@ function actualizarConfirmacion(rowIndex, estado) {
   sheet.getRange(rowIndex, 7).setValue(ahora);
 
   return { success: true, rowIndex: rowIndex, estado: estado };
+}
+
+// -----------------------------------------------
+// Agrega una sola cita al final de la hoja
+// -----------------------------------------------
+function agregarCita(data) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOMBRE_HOJA);
+  if (!sheet) return { error: 'No se encontró la hoja: ' + NOMBRE_HOJA };
+
+  sheet.appendRow([
+    data.nombre   || '',
+    data.telefono || '',
+    data.fecha    || '',
+    data.hora     || '',
+    data.servicio || '',
+    '',  // Confirmación (vacía al crear)
+    ''   // Fecha Confirmación (vacía al crear)
+  ]);
+
+  return { success: true };
+}
+
+// -----------------------------------------------
+// Agrega múltiples citas en bloque
+// -----------------------------------------------
+function agregarCitas(citas) {
+  if (!citas || citas.length === 0) return { success: true, count: 0 };
+
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOMBRE_HOJA);
+  if (!sheet) return { error: 'No se encontró la hoja: ' + NOMBRE_HOJA };
+
+  var rows = citas.map(function(c) {
+    return [
+      c.nombre   || '',
+      c.telefono || '',
+      c.fecha    || '',
+      c.hora     || '',
+      c.servicio || '',
+      '',
+      ''
+    ];
+  });
+
+  var lastRow = sheet.getLastRow();
+  sheet.getRange(lastRow + 1, 1, rows.length, 7).setValues(rows);
+
+  return { success: true, count: rows.length };
 }
 
 // -----------------------------------------------
