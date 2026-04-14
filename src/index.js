@@ -404,53 +404,61 @@ function renderClienteDashboard(cliente, inst, citas) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="refresh" content="60">${css}
   <style>
-    /* Estado WA compacto */
     .wa-bar{display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:12px 18px;box-shadow:0 1px 4px rgba(0,0,0,.07);flex-wrap:wrap;margin-bottom:20px}
     .wa-dot{width:10px;height:10px;border-radius:50%;background:#16a34a;flex-shrink:0;box-shadow:0 0 0 3px #dcfce7}
+    /* Layout principal: calendario + panel lado a lado */
+    .dash-layout{display:grid;grid-template-columns:1fr 320px;gap:16px;margin-top:20px;align-items:start}
+    @media(max-width:780px){.dash-layout{grid-template-columns:1fr}}
     /* Calendario */
-    .cal-wrap{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;margin-top:20px}
-    .cal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f1f5f9}
-    .cal-title{font-size:17px;font-weight:700;text-transform:capitalize;color:#0f172a}
-    .cal-nav{background:none;border:none;cursor:pointer;padding:6px 12px;border-radius:8px;font-size:18px;color:#475569;transition:background .15s}
+    .cal-wrap{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden}
+    .cal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #f1f5f9}
+    .cal-title{font-size:16px;font-weight:700;text-transform:capitalize;color:#0f172a}
+    .cal-nav{background:none;border:none;cursor:pointer;padding:4px 12px;border-radius:8px;font-size:20px;color:#475569;transition:background .15s}
     .cal-nav:hover{background:#f1f5f9}
     .cal-grid{display:grid;grid-template-columns:repeat(7,1fr)}
-    .cal-dn{text-align:center;padding:10px 2px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;background:#f8fafc;border-bottom:1px solid #f1f5f9}
-    .cal-day{min-height:90px;padding:6px 6px 4px;border-top:1px solid #f1f5f9;border-right:1px solid #f1f5f9;cursor:default;transition:background .1s}
+    .cal-dn{text-align:center;padding:8px 2px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;background:#f8fafc;border-bottom:1px solid #f1f5f9}
+    .cal-day{min-height:80px;padding:5px 5px 3px;border-top:1px solid #f1f5f9;border-right:1px solid #f1f5f9;cursor:default;transition:background .1s;box-sizing:border-box}
     .cal-day:nth-child(7n){border-right:none}
     .cal-day.empty{background:#fafafa}
-    .cal-day.has-ev{background:#f8fbff}
+    .cal-day.has-ev{cursor:pointer}
+    .cal-day.has-ev:hover{background:#f0f7ff}
+    .cal-day.selected{background:#eff6ff;outline:2px solid #3b82f6;outline-offset:-2px}
     .cal-day.today .cal-num{background:#3b82f6;color:#fff;border-radius:50%}
-    .cal-day.past{opacity:.55}
-    .cal-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;font-size:13px;font-weight:600;color:#374151}
-    .cal-ev{font-size:11px;border-radius:4px;padding:2px 6px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+    .cal-day.past{opacity:.5}
+    .cal-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:13px;font-weight:600;color:#374151}
+    /* Pills dentro del día */
+    .cal-ev{font-size:10px;border-radius:3px;padding:1px 5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:1.5}
     .cal-ev.pendiente{background:#dbeafe;color:#1d4ed8}
     .cal-ev.enviado{background:#e0e7ff;color:#4338ca}
     .cal-ev.confirmado{background:#dcfce7;color:#15803d}
     .cal-ev.cancelado{background:#fee2e2;color:#b91c1c}
-    .cal-more{font-size:10px;color:#94a3b8;margin-top:2px;padding-left:4px}
-    /* Móvil: ocultar pills, mostrar puntos de color */
-    .cal-dots{display:none;gap:3px;flex-wrap:wrap;padding:4px 2px}
-    .cal-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-    @media(max-width:640px){
-      .cal-day{min-height:56px;padding:4px}
-      .cal-num{width:22px;height:22px;font-size:12px}
-      .cal-ev{display:none}
-      .cal-more{display:none}
+    .cal-more{font-size:10px;color:#94a3b8;margin-top:1px;padding-left:3px}
+    /* Puntos móvil */
+    .cal-dots{display:none;gap:3px;flex-wrap:wrap;padding:3px 1px}
+    .cal-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    @media(max-width:540px){
+      .cal-day{min-height:52px;padding:3px}
+      .cal-num{width:20px;height:20px;font-size:11px}
+      .cal-ev,.cal-more{display:none}
       .cal-dots{display:flex}
     }
-    /* Lista citas del día (panel lateral / bajo el calendario en móvil) */
-    .day-panel{margin-top:20px}
-    .day-panel h2{font-size:15px;font-weight:700;margin-bottom:12px;color:#374151}
-    .day-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f1f5f9}
+    /* Panel lateral de citas del día */
+    .day-panel{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;position:sticky;top:16px}
+    .day-panel-head{padding:14px 16px;border-bottom:1px solid #f1f5f9;background:#f8fafc}
+    .day-panel-title{font-size:14px;font-weight:700;color:#0f172a;margin:0}
+    .day-panel-sub{font-size:12px;color:#64748b;margin-top:2px}
+    .day-panel-empty{padding:32px 16px;text-align:center;color:#94a3b8;font-size:13px}
+    .day-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f8fafc;transition:background .1s}
     .day-item:last-child{border-bottom:none}
-    .day-hour{font-size:13px;font-weight:700;color:#3b82f6;min-width:50px}
+    .day-item:hover{background:#f8fafc}
+    .day-hour{font-size:13px;font-weight:700;color:#3b82f6;min-width:44px;flex-shrink:0}
     .day-info{flex:1;min-width:0}
-    .day-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .day-svc{font-size:12px;color:#64748b}
+    .day-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0f172a}
+    .day-svc{font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .day-badge{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;flex-shrink:0}
   </style>
 </head><body>${navCliente('estado',cliente.nombre)}
   <div class="container">
-    <!-- Barra estado WA -->
     <div class="wa-bar">
       <span class="wa-dot"></span>
       <span style="font-size:14px;font-weight:600;color:#15803d">WhatsApp conectado</span>
@@ -460,33 +468,35 @@ function renderClienteDashboard(cliente, inst, citas) {
         <button class="btn btn-danger btn-sm">🔄 Cambiar número</button>
       </form>
     </div>
-    <!-- Stats -->
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:4px">${stats}</div>
-    <!-- Calendario -->
-    <div class="cal-wrap">
-      <div class="cal-head">
-        <button class="cal-nav" onclick="cambiarMes(-1)">&#8249;</button>
-        <span class="cal-title" id="cal-titulo"></span>
-        <button class="cal-nav" onclick="cambiarMes(1)">&#8250;</button>
+    <div class="dash-layout">
+      <!-- Calendario -->
+      <div class="cal-wrap">
+        <div class="cal-head">
+          <button class="cal-nav" onclick="cambiarMes(-1)">&#8249;</button>
+          <span class="cal-title" id="cal-titulo"></span>
+          <button class="cal-nav" onclick="cambiarMes(1)">&#8250;</button>
+        </div>
+        <div class="cal-grid">
+          ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div class="cal-dn">${d}</div>`).join('')}
+        </div>
+        <div class="cal-grid" id="cal-celdas"></div>
       </div>
-      <div class="cal-grid" id="cal-nombres">
-        ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div class="cal-dn">${d}</div>`).join('')}
+      <!-- Panel citas del día -->
+      <div class="day-panel" id="day-panel">
+        <div class="day-panel-head">
+          <div class="day-panel-title" id="day-panel-title">Selecciona un día</div>
+          <div class="day-panel-sub" id="day-panel-sub">Toca un día con citas para ver el detalle</div>
+        </div>
+        <div id="day-panel-list"><div class="day-panel-empty">📅 Ningún día seleccionado</div></div>
       </div>
-      <div class="cal-grid" id="cal-celdas"></div>
-    </div>
-    <!-- Panel citas del día seleccionado -->
-    <div class="day-panel card" id="day-panel" style="display:none;padding:0;overflow:hidden">
-      <div style="padding:14px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
-        <h2 id="day-panel-title" style="font-size:15px;font-weight:700;margin:0"></h2>
-        <button onclick="document.getElementById('day-panel').style.display='none'" class="btn-ghost btn" style="font-size:18px;padding:0 4px;line-height:1">×</button>
-      </div>
-      <div id="day-panel-list"></div>
     </div>
   </div>
   <script>
     const CITAS = ${citasJS};
     const HOY   = new Date();
     let mes = HOY.getMonth(), anio = HOY.getFullYear();
+    let selKey = null;
 
     function fechaKey(d,m,a){ return String(d).padStart(2,'0')+'/'+String(m+1).padStart(2,'0')+'/'+a; }
 
@@ -497,27 +507,28 @@ function renderClienteDashboard(cliente, inst, citas) {
       if(e==='ENVIADO')    return 'enviado';
       return 'pendiente';
     }
-    const colEv = {'pendiente':'#3b82f6','enviado':'#818cf8','confirmado':'#16a34a','cancelado':'#ef4444'};
+    const colEv   = {pendiente:'#3b82f6',enviado:'#818cf8',confirmado:'#16a34a',cancelado:'#ef4444'};
+    const bgBadge = {pendiente:'#dbeafe',enviado:'#e0e7ff',confirmado:'#dcfce7',cancelado:'#fee2e2'};
+    const txBadge = {pendiente:'#1d4ed8',enviado:'#4338ca',confirmado:'#15803d',cancelado:'#b91c1c'};
+    const lblEv   = {pendiente:'Sin enviar',enviado:'Esperando',confirmado:'Confirmado ✓',cancelado:'Cancelado'};
 
     function renderCal(){
       const hoy1 = new Date(HOY.getFullYear(),HOY.getMonth(),HOY.getDate());
       const titulo = new Date(anio,mes,1).toLocaleDateString('es',{month:'long',year:'numeric'});
       document.getElementById('cal-titulo').textContent = titulo.charAt(0).toUpperCase()+titulo.slice(1);
 
-      const primer = new Date(anio,mes,1).getDay(); // 0=Dom
-      const offset = primer===0 ? 6 : primer-1;     // Lunes=0
+      const primer  = new Date(anio,mes,1).getDay();
+      const offset  = primer===0 ? 6 : primer-1;
       const diasMes = new Date(anio,mes+1,0).getDate();
-
-      const grid = document.getElementById('cal-celdas');
+      const grid    = document.getElementById('cal-celdas');
       grid.innerHTML = '';
 
-      // Celdas vacías al inicio
       for(let i=0;i<offset;i++){
         const el=document.createElement('div'); el.className='cal-day empty'; grid.appendChild(el);
       }
 
       for(let d=1;d<=diasMes;d++){
-        const fk = fechaKey(d,mes,anio);
+        const fk       = fechaKey(d,mes,anio);
         const citasDia = CITAS.filter(c=>c.fecha===fk);
         const diaDate  = new Date(anio,mes,d);
         const esPasado = diaDate < hoy1;
@@ -525,83 +536,89 @@ function renderClienteDashboard(cliente, inst, citas) {
 
         const el = document.createElement('div');
         el.className = 'cal-day'
-          + (citasDia.length?  ' has-ev':'')
-          + (esHoy?  ' today':'')
-          + (esPasado && !esHoy? ' past':'');
+          + (citasDia.length ? ' has-ev' : '')
+          + (esHoy           ? ' today'  : '')
+          + (esPasado && !esHoy ? ' past' : '')
+          + (selKey===fk     ? ' selected' : '');
 
-        // Número del día
         const num = document.createElement('span');
         num.className='cal-num'; num.textContent=d; el.appendChild(num);
 
-        // Pills (desktop)
-        const max=3;
+        // Pills — máx 2 en escritorio
+        const max=2;
         citasDia.slice(0,max).forEach(c=>{
           const ev=document.createElement('span');
           ev.className='cal-ev '+claseEv(c.estado);
-          ev.textContent=c.hora+' '+c.nombre;
-          ev.title=c.nombre+' — '+c.servicio+' ('+c.hora+')';
+          ev.textContent=(c.hora?c.hora+' ':'')+c.nombre;
+          ev.title=c.nombre+' — '+c.servicio+(c.hora?' ('+c.hora+')':'');
           el.appendChild(ev);
         });
         if(citasDia.length>max){
           const more=document.createElement('span');
           more.className='cal-more';
-          more.textContent='+'+( citasDia.length-max)+' más';
+          more.textContent='+'+(citasDia.length-max)+' más';
           el.appendChild(more);
         }
 
-        // Puntos de color (móvil)
+        // Puntos móvil
         if(citasDia.length){
           const dots=document.createElement('div'); dots.className='cal-dots';
           citasDia.slice(0,5).forEach(c=>{
             const dot=document.createElement('span');
-            dot.className='cal-dot';
-            dot.style.background=colEv[claseEv(c.estado)];
+            dot.className='cal-dot'; dot.style.background=colEv[claseEv(c.estado)];
             dots.appendChild(dot);
           });
           el.appendChild(dots);
         }
 
-        // Click → mostrar panel lateral
         if(citasDia.length){
-          el.style.cursor='pointer';
-          el.addEventListener('click',()=>mostrarPanel(fk,citasDia));
+          el.addEventListener('click',()=>mostrarPanel(fk,citasDia,esHoy));
         }
-
         grid.appendChild(el);
       }
     }
 
-    function mostrarPanel(fecha,citas){
-      const panel = document.getElementById('day-panel');
-      const titulo= document.getElementById('day-panel-title');
-      const lista = document.getElementById('day-panel-list');
+    function mostrarPanel(fecha,citas,esHoy){
+      selKey=fecha;
+      renderCal(); // re-render para marcar selected
       const [d,m,a]=fecha.split('/');
       const fechaLarga=new Date(a,m-1,d).toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'});
-      titulo.textContent=fechaLarga.charAt(0).toUpperCase()+fechaLarga.slice(1);
-      const sorted=[...citas].sort((a,b)=>a.hora.localeCompare(b.hora));
-      lista.innerHTML=sorted.map(c=>\`<div class="day-item">
-        <span class="day-hour">\${c.hora}</span>
-        <div class="day-info">
-          <div class="day-name">\${c.nombre}</div>
-          <div class="day-svc">\${c.servicio}</div>
-        </div>
-        <span class="badge" style="background:\${{'pendiente':'#dbeafe','enviado':'#e0e7ff','confirmado':'#dcfce7','cancelado':'#fee2e2'}[claseEv(c.estado)]};color:\${{'pendiente':'#1d4ed8','enviado':'#4338ca','confirmado':'#15803d','cancelado':'#b91c1c'}[claseEv(c.estado)]}">
-          \${{'pendiente':'Sin enviar','enviado':'Esperando','confirmado':'Confirmado ✓','cancelado':'Cancelado'}[claseEv(c.estado)]}
-        </span>
-      </div>\`).join('');
-      panel.style.display='block';
-      panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+      const label=fechaLarga.charAt(0).toUpperCase()+fechaLarga.slice(1);
+      document.getElementById('day-panel-title').textContent=label+(esHoy?' (hoy)':'');
+      document.getElementById('day-panel-sub').textContent=citas.length+' cita'+(citas.length!==1?'s':'')+' agendada'+(citas.length!==1?'s':'');
+      const sorted=[...citas].sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
+      const lista=document.getElementById('day-panel-list');
+      lista.innerHTML=sorted.map(c=>{
+        const cls=claseEv(c.estado);
+        return \`<div class="day-item">
+          <span class="day-hour">\${c.hora||'--:--'}</span>
+          <div class="day-info">
+            <div class="day-name">\${c.nombre}</div>
+            <div class="day-svc">\${c.servicio||'—'}</div>
+          </div>
+          <span class="day-badge" style="background:\${bgBadge[cls]};color:\${txBadge[cls]}">\${lblEv[cls]}</span>
+        </div>\`;
+      }).join('');
+      // En móvil, hacer scroll al panel
+      if(window.innerWidth<780) document.getElementById('day-panel').scrollIntoView({behavior:'smooth',block:'start'});
     }
 
     function cambiarMes(delta){
-      mes+=delta;
-      if(mes<0){mes=11;anio--;}
-      if(mes>11){mes=0;anio++;}
-      document.getElementById('day-panel').style.display='none';
+      mes+=delta; selKey=null;
+      if(mes<0){mes=11;anio--;} if(mes>11){mes=0;anio++;}
+      document.getElementById('day-panel-title').textContent='Selecciona un día';
+      document.getElementById('day-panel-sub').textContent='Toca un día con citas para ver el detalle';
+      document.getElementById('day-panel-list').innerHTML='<div class="day-panel-empty">📅 Ningún día seleccionado</div>';
       renderCal();
     }
 
     renderCal();
+    // Abrir automáticamente el día de hoy si tiene citas
+    (function(){
+      const hoyKey=fechaKey(HOY.getDate(),HOY.getMonth(),HOY.getFullYear());
+      const citasHoy=CITAS.filter(c=>c.fecha===hoyKey);
+      if(citasHoy.length) mostrarPanel(hoyKey,citasHoy,true);
+    })();
   </script>
 ${htmlFooter}</body></html>`;
 }

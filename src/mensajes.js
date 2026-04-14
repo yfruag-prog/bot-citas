@@ -30,8 +30,25 @@ function formatearHora(horaStr) {
 }
 
 function parsearFecha(fechaStr, timezone) {
-  for (const fmt of ['DD/MM/YYYY','D/M/YYYY','DD-MM-YYYY','YYYY-MM-DD','DD/MM/YY']) {
-    const f = moment.tz(fechaStr, fmt, timezone);
+  const str = String(fechaStr || '').trim();
+  // DD/MM/YYYY o D/M/YYYY — extraer componentes manualmente para evitar ambigüedad
+  const mDMY = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mDMY) {
+    const iso = `${mDMY[3]}-${mDMY[2].padStart(2,'0')}-${mDMY[1].padStart(2,'0')}`;
+    const f = moment.tz(iso, 'YYYY-MM-DD', true, timezone);
+    if (f.isValid()) return f;
+  }
+  // YYYY-MM-DD
+  const mISO = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (mISO) {
+    const f = moment.tz(str, 'YYYY-MM-DD', true, timezone);
+    if (f.isValid()) return f;
+  }
+  // DD-MM-YYYY
+  const mDMY2 = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (mDMY2) {
+    const iso = `${mDMY2[3]}-${mDMY2[2].padStart(2,'0')}-${mDMY2[1].padStart(2,'0')}`;
+    const f = moment.tz(iso, 'YYYY-MM-DD', true, timezone);
     if (f.isValid()) return f;
   }
   return null;
