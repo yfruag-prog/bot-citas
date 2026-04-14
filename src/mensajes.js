@@ -108,10 +108,10 @@ function crearMensajesInterface(config = {}) {
     },
     debeEnviarHoy(cita) {
       const dias = parseInt(config.daysBefore ?? 1);
-      const hoy = moment().tz(tz);
+      const hoy   = moment().tz(tz).startOf('day');
       const fecha = parsearFecha(cita.fecha, tz);
       if (!fecha) return false;
-      return fecha.diff(hoy, 'days') === dias;
+      return fecha.startOf('day').diff(hoy, 'days') === dias;
     },
   };
 }
