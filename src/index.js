@@ -1125,20 +1125,29 @@ function iniciarCron(id) {
   const inst = instancias.get(id); if (!inst) return;
   if (inst.cronJob) inst.cronJob.stop();
   const cfg = obtenerCliente(id); if (!cfg) return;
-  const [hh, mm] = (cfg.sendHour || '09:00').split(':');
-  inst.cronJob = cron.schedule(`${parseInt(mm)} ${parseInt(hh)} * * *`, async () => {
+
+  // Correr cada 15 minutos para enviar exactamente cuando corresponda según hora de la cita
+  inst.cronJob = cron.schedule('*/15 * * * *', async () => {
     const c = obtenerCliente(id); if (!c || !inst.conectado) return;
-    console.log(`\n[${id}] Enviando recordatorios programados...`);
     try {
-      const sh  = crearSheetsInterface(c.googleScriptUrl, c.countryCode);
-      const msg = crearMensajesInterface(c);
-      const hoy = (await sh.getCitas()).filter(x => (!x.confirmacion || x.confirmacion === '') && msg.debeEnviarHoy(x));
+      const sh   = crearSheetsInterface(c.googleScriptUrl, c.countryCode);
+      const msg  = crearMensajesInterface(c);
+      const citas = await sh.getCitas();
+      const pendientes = citas.filter(x => (!x.confirmacion || x.confirmacion === '') && msg.debeEnviarAhora(x, 16));
+      if (!pendientes.length) return;
+      console.log(`\n[${id}] ${pendientes.length} recordatorio(s) a enviar...`);
       let n = 0;
-      for (const cita of hoy) {
-        try { await enviarMensajeACita(id, cita, sh); n++; await sleep(2000); }
-        catch (e) { console.error(`[${id}] Cron error ${cita.nombre}:`, e.message); }
+      for (const cita of pendientes) {
+        try {
+          await enviarMensajeACita(id, cita, sh);
+          n++;
+          if (n < pendientes.length) {
+            // Delay aleatorio 30–90 s entre mensajes para evitar bloqueo de WhatsApp
+            await sleep(30000 + Math.random() * 60000);
+          }
+        } catch (e) { console.error(`[${id}] Error enviando ${cita.nombre}:`, e.message); }
       }
-      console.log(`[${id}] Recordatorios enviados: ${n}/${hoy.length}`);
+      console.log(`[${id}] Recordatorios enviados: ${n}/${pendientes.length}`);
     } catch (e) { console.error(`[${id}] Cron error:`, e.message); }
   }, { timezone: cfg.timezone || 'America/Bogota' });
 }

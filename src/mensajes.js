@@ -106,12 +106,25 @@ function crearMensajesInterface(config = {}) {
     getMensajeNoEntendido() {
       return config.unknownMessage || DEFAULTS.unknownMessage;
     },
-    debeEnviarHoy(cita) {
-      const dias = parseInt(config.daysBefore ?? 1);
-      const hoy   = moment().tz(tz).startOf('day');
+    debeEnviarAhora(cita, ventanaMin = 16) {
+      const dias  = parseInt(config.daysBefore ?? 1);
+      const ahora = moment().tz(tz);
       const fecha = parsearFecha(cita.fecha, tz);
       if (!fecha) return false;
-      return fecha.startOf('day').diff(hoy, 'days') === dias;
+
+      // Construir datetime completo de la cita (fecha + hora)
+      let citaDT = fecha.clone().startOf('day');
+      if (cita.hora) {
+        const mh = String(cita.hora).match(/^(\d{1,2}):(\d{2})/);
+        if (mh) citaDT.hour(parseInt(mh[1])).minute(parseInt(mh[2])).second(0);
+      }
+
+      // Momento ideal de envío = cita - días de anticipación
+      const envioIdeal = citaDT.clone().subtract(dias, 'days');
+
+      // Enviar si el momento ideal cayó dentro de los últimos `ventanaMin` minutos
+      const diffMin = ahora.diff(envioIdeal, 'minutes');
+      return diffMin >= 0 && diffMin < ventanaMin;
     },
   };
 }
