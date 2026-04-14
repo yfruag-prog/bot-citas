@@ -388,9 +388,16 @@ function renderClienteDashboard(cliente, inst, citas) {
   </div>`).join('');
 
   // Normalizar fechas a DD/MM/YYYY con ceros antes de serializar
+  // (las fechas ya vienen normalizadas desde sheets.js, esto es un seguro adicional)
   function normFecha(f) {
-    const m = (f || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    return m ? `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}/${m[3]}` : (f || '');
+    const str = String(f || '').trim();
+    const mDMY = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (mDMY) return `${mDMY[1].padStart(2,'0')}/${mDMY[2].padStart(2,'0')}/${mDMY[3]}`;
+    const mISO = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (mISO) return `${mISO[3]}/${mISO[2]}/${mISO[1]}`;
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    return str;
   }
 
   // Serializar citas para el calendario JS
