@@ -20,18 +20,19 @@ function normalizarHora(h) {
   const str = String(h || '').trim();
   if (!str) return '';
   // Ya es HH:mm o H:mm
-  if (/^\d{1,2}:\d{2}$/.test(str)) return str.padStart(5, '0');
+  if (/^\d{1,2}:\d{2}$/.test(str)) return str.length === 4 ? '0' + str : str;
   // Número fracción de día (ej: 0.75 = 18:00)
-  if (/^\d+(\.\d+)?$/.test(str)) {
+  if (/^\d+\.\d+$/.test(str)) {
     const totalMin = Math.round(parseFloat(str) * 24 * 60);
     const hh = Math.floor(totalMin / 60) % 24;
     const mm = totalMin % 60;
     return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
   }
-  // Date.toString() o ISO — extraer hora local del string
-  const d = new Date(str);
-  if (!isNaN(d.getTime())) {
-    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  // Date.toString(): "Sat Dec 30 1899 18:43:00 GMT-0456 ..."
+  // Extraer HH:mm directamente del string para evitar conversión de zona horaria
+  const mTime = str.match(/(\d{1,2}):(\d{2}):\d{2}/);
+  if (mTime) {
+    return `${mTime[1].padStart(2,'0')}:${mTime[2]}`;
   }
   return str;
 }
