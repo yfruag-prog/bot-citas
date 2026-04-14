@@ -1110,8 +1110,9 @@ async function enviarMensajeACita(clienteId, cita, sh) {
   const msg  = crearMensajesInterface(cfg);
   const nid  = await inst.client.getNumberId(cita.telefono);
   if (!nid) { await sh.actualizarConfirmacion(cita.rowIndex, 'NUMERO_INVALIDO'); throw new Error(`Número no encontrado: ${cita.telefono}`); }
-  const waId = nid._serialized;
-  await inst.client.sendMessage(waId, msg.getMensajeCita(cita));
+  // Usar @c.us porque msg.from siempre llega en ese formato (nid._serialized puede ser @lid en versiones nuevas de WA)
+  const waId = `${cita.telefono}@c.us`;
+  await inst.client.sendMessage(nid._serialized, msg.getMensajeCita(cita));
   inst.citasPendientes.set(waId, cita);
   console.log(`   [${clienteId}] ✉️ Enviado a ${cita.nombre} — waId guardado: ${waId} (total pendientes: ${inst.citasPendientes.size})`);
   try { await sh.marcarComoEnviado(cita.rowIndex); }
@@ -1124,8 +1125,7 @@ async function cargarCitasPendientesInst(clienteId, sh) {
     const citas = await sh.getCitas();
     let n = 0;
     for (const c of citas.filter(x => x.confirmacion === 'ENVIADO')) {
-      const nid  = await inst.client.getNumberId(c.telefono);
-      const waId = nid ? nid._serialized : `${c.telefono}@c.us`;
+      const waId = `${c.telefono}@c.us`;
       inst.citasPendientes.set(waId, c); n++;
     }
     if (n) console.log(`[${clienteId}] ${n} cita(s) pendiente(s) cargada(s)`);
