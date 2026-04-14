@@ -434,12 +434,10 @@ function renderClienteDashboard(cliente, inst, citas) {
     .cal-day.past{opacity:.5}
     .cal-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:13px;font-weight:600;color:#374151}
     /* Pills dentro del día */
-    .cal-ev{font-size:10px;border-radius:3px;padding:1px 5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:1.5}
-    .cal-ev.pendiente{background:#dbeafe;color:#1d4ed8}
-    .cal-ev.enviado{background:#e0e7ff;color:#4338ca}
-    .cal-ev.confirmado{background:#dcfce7;color:#15803d}
-    .cal-ev.cancelado{background:#fee2e2;color:#b91c1c}
-    .cal-more{font-size:10px;color:#94a3b8;margin-top:1px;padding-left:3px}
+    .cal-ev{font-size:10px;border-radius:3px;padding:2px 5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:3px;line-height:1.4;background:#eff6ff;color:#1e40af;font-weight:500}
+    .cal-ev-hora{font-weight:700;flex-shrink:0;color:#3b82f6}
+    .cal-ev-nombre{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cal-more{font-size:10px;color:#94a3b8;margin-top:2px;padding-left:3px}
     /* Puntos móvil */
     .cal-dots{display:none;gap:3px;flex-wrap:wrap;padding:3px 1px}
     .cal-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
@@ -555,13 +553,14 @@ function renderClienteDashboard(cliente, inst, citas) {
         const num = document.createElement('span');
         num.className='cal-num'; num.textContent=d; el.appendChild(num);
 
-        // Pills — máx 2 en escritorio
-        const max=2;
+        // Pills — máx 3 en escritorio: solo hora + nombre
+        const max=3;
         citasDia.slice(0,max).forEach(c=>{
           const ev=document.createElement('span');
-          ev.className='cal-ev '+claseEv(c.estado);
-          ev.textContent=(c.hora?c.hora+' ':'')+c.nombre;
-          ev.title=c.nombre+' — '+c.servicio+(c.hora?' ('+c.hora+')':'');
+          ev.className='cal-ev';
+          ev.title=c.nombre+(c.servicio?' — '+c.servicio:'')+(c.hora?' ('+c.hora+')':'');
+          if(c.hora){const h=document.createElement('span');h.className='cal-ev-hora';h.textContent=c.hora;ev.appendChild(h);}
+          const n=document.createElement('span');n.className='cal-ev-nombre';n.textContent=c.nombre;ev.appendChild(n);
           el.appendChild(ev);
         });
         if(citasDia.length>max){
