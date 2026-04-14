@@ -4,16 +4,34 @@
 function normalizarFecha(f) {
   const str = String(f || '').trim();
   if (!str) return '';
-  // Ya es DD/MM/YYYY o D/M/YYYY
   const mDMY = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (mDMY) return `${mDMY[1].padStart(2,'0')}/${mDMY[2].padStart(2,'0')}/${mDMY[3]}`;
-  // ISO 8601: 2026-04-15 o 2026-04-15T05:00:00.000Z
   const mISO = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (mISO) return `${mISO[3]}/${mISO[2]}/${mISO[1]}`;
-  // Date.toString(): "Wed Apr 15 2026 00:00:00 GMT-0500 ..."
   const d = new Date(str);
   if (!isNaN(d.getTime())) {
     return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  }
+  return str;
+}
+
+// Normaliza cualquier formato de hora a HH:mm
+function normalizarHora(h) {
+  const str = String(h || '').trim();
+  if (!str) return '';
+  // Ya es HH:mm o H:mm
+  if (/^\d{1,2}:\d{2}$/.test(str)) return str.padStart(5, '0');
+  // Número fracción de día (ej: 0.75 = 18:00)
+  if (/^\d+(\.\d+)?$/.test(str)) {
+    const totalMin = Math.round(parseFloat(str) * 24 * 60);
+    const hh = Math.floor(totalMin / 60) % 24;
+    const mm = totalMin % 60;
+    return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+  }
+  // Date.toString() o ISO — extraer hora local del string
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   }
   return str;
 }
@@ -55,7 +73,7 @@ function crearSheetsInterface(scriptUrl, codigoPais = '57') {
     async getCitas() {
       const datos = await llamar('GET', { action: 'getCitas' });
       if (datos.error) throw new Error(datos.error);
-      return datos.map(c => ({ ...c, telefono: formatPhone(c.telefono, codigoPais), fecha: normalizarFecha(c.fecha) }));
+      return datos.map(c => ({ ...c, telefono: formatPhone(c.telefono, codigoPais), fecha: normalizarFecha(c.fecha), hora: normalizarHora(c.hora) }));
     },
 
     async actualizarConfirmacion(rowIndex, estado) {
