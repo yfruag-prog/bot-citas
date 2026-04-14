@@ -1032,9 +1032,12 @@ function inicializarInstancia(clienteConfig) {
 
   wa.on('message', async msg => {
     try {
+      console.log(`[${id}] 📨 RAW msg.from=${msg.from} fromMe=${msg.fromMe} isGroup=${msg.from.endsWith('@g.us')} body="${msg.body?.trim()?.substring(0,30)}"`);
       // Ignorar grupos y mensajes vacíos
-      if (msg.from.endsWith('@g.us') || !msg.body?.trim()) return;
+      if (msg.fromMe || msg.from.endsWith('@g.us') || !msg.body?.trim()) return;
       const cfg = obtenerCliente(id); if (!cfg) return;
+      const inst2 = instancias.get(id);
+      console.log(`[${id}] 📋 citasPendientes.size=${inst2?.citasPendientes?.size} keys=[${[...(inst2?.citasPendientes?.keys()||[])].join(', ')}]`);
       let sh = null;
       try { sh = crearSheetsInterface(cfg.googleScriptUrl, cfg.countryCode); } catch {}
       await manejarMensaje(id, msg, cfg, sh);
@@ -1109,9 +1112,10 @@ async function enviarMensajeACita(clienteId, cita, sh) {
   if (!nid) { await sh.actualizarConfirmacion(cita.rowIndex, 'NUMERO_INVALIDO'); throw new Error(`Número no encontrado: ${cita.telefono}`); }
   const waId = nid._serialized;
   await inst.client.sendMessage(waId, msg.getMensajeCita(cita));
-  await sh.marcarComoEnviado(cita.rowIndex);
   inst.citasPendientes.set(waId, cita);
-  console.log(`   [${clienteId}] ✉️ Enviado a ${cita.nombre} (${waId})`);
+  console.log(`   [${clienteId}] ✉️ Enviado a ${cita.nombre} — waId guardado: ${waId} (total pendientes: ${inst.citasPendientes.size})`);
+  try { await sh.marcarComoEnviado(cita.rowIndex); }
+  catch (e) { console.error(`[${clienteId}] Error marcando enviado en Sheet:`, e.message); }
 }
 
 async function cargarCitasPendientesInst(clienteId, sh) {
