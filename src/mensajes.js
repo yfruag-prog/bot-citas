@@ -31,19 +31,23 @@ function formatearHora(horaStr) {
 
 function parsearFecha(fechaStr, timezone) {
   const str = String(fechaStr || '').trim();
-  // DD/MM/YYYY o D/M/YYYY — extraer componentes manualmente para evitar ambigüedad
+  if (!str) return null;
+
+  // DD/MM/YYYY o D/M/YYYY (formato colombiano estándar)
   const mDMY = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (mDMY) {
     const iso = `${mDMY[3]}-${mDMY[2].padStart(2,'0')}-${mDMY[1].padStart(2,'0')}`;
     const f = moment.tz(iso, 'YYYY-MM-DD', true, timezone);
     if (f.isValid()) return f;
   }
-  // YYYY-MM-DD
-  const mISO = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  // YYYY-MM-DD con posible sufijo T... (ISO 8601 de Apps Script)
+  const mISO = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (mISO) {
-    const f = moment.tz(str, 'YYYY-MM-DD', true, timezone);
+    const f = moment.tz(`${mISO[1]}-${mISO[2]}-${mISO[3]}`, 'YYYY-MM-DD', true, timezone);
     if (f.isValid()) return f;
   }
+
   // DD-MM-YYYY
   const mDMY2 = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if (mDMY2) {
@@ -51,6 +55,11 @@ function parsearFecha(fechaStr, timezone) {
     const f = moment.tz(iso, 'YYYY-MM-DD', true, timezone);
     if (f.isValid()) return f;
   }
+
+  // Fallback: cubrir Date.toString() "Wed Apr 15 2026 00:00:00 GMT-0500 ..." y otros
+  const fallback = moment.tz(str, timezone);
+  if (fallback.isValid()) return fallback;
+
   return null;
 }
 

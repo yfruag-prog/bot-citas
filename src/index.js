@@ -500,6 +500,10 @@ function renderClienteDashboard(cliente, inst, citas) {
 
     function fechaKey(d,m,a){ return String(d).padStart(2,'0')+'/'+String(m+1).padStart(2,'0')+'/'+a; }
 
+    // DEBUG TEMPORAL — muestra info para diagnosticar
+    console.log('CITAS cargadas:', CITAS.length, CITAS.map(c=>c.fecha));
+    console.log('HOY key:', fechaKey(HOY.getDate(), HOY.getMonth(), HOY.getFullYear()));
+
     function claseEv(estado){
       const e = (estado||'').toUpperCase();
       if(e==='CONFIRMADO') return 'confirmado';
