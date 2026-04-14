@@ -423,26 +423,30 @@ function renderClienteDashboard(cliente, inst, citas) {
     .cal-nav{background:none;border:none;cursor:pointer;padding:4px 12px;border-radius:8px;font-size:20px;color:#475569;transition:background .15s}
     .cal-nav:hover{background:#f1f5f9}
     .cal-grid{display:grid;grid-template-columns:repeat(7,1fr)}
-    .cal-dn{text-align:center;padding:8px 2px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;background:#f8fafc;border-bottom:1px solid #f1f5f9}
-    .cal-day{min-height:80px;padding:5px 5px 3px;border-top:1px solid #f1f5f9;border-right:1px solid #f1f5f9;cursor:default;transition:background .1s;box-sizing:border-box}
+    .cal-dn{text-align:center;padding:6px 2px;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;background:#f8fafc;border-bottom:1px solid #f1f5f9}
+    .cal-day{min-height:72px;padding:4px 4px 2px;border-top:1px solid #f1f5f9;border-right:1px solid #f1f5f9;cursor:default;transition:background .1s;box-sizing:border-box;overflow:hidden}
     .cal-day:nth-child(7n){border-right:none}
     .cal-day.empty{background:#fafafa}
     .cal-day.has-ev{cursor:pointer}
     .cal-day.has-ev:hover{background:#f0f7ff}
     .cal-day.selected{background:#eff6ff;outline:2px solid #3b82f6;outline-offset:-2px}
     .cal-day.today .cal-num{background:#3b82f6;color:#fff;border-radius:50%}
-    .cal-day.past{opacity:.5}
-    .cal-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:13px;font-weight:600;color:#374151}
+    .cal-day.past{opacity:.55}
+    .cal-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;font-size:12px;font-weight:600;color:#374151}
     /* Pills dentro del día */
-    .cal-ev{font-size:10px;border-radius:3px;padding:2px 5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:3px;line-height:1.4;background:#eff6ff;color:#1e40af;font-weight:500}
-    .cal-ev-hora{font-weight:700;flex-shrink:0;color:#3b82f6}
+    .cal-ev{font-size:10px;border-radius:3px;padding:1px 4px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:2px;line-height:1.5;font-weight:500}
+    .cal-ev.pendiente{background:#dbeafe;color:#1d4ed8}
+    .cal-ev.enviado{background:#e0e7ff;color:#4338ca}
+    .cal-ev.confirmado{background:#dcfce7;color:#15803d}
+    .cal-ev.cancelado{background:#fee2e2;color:#b91c1c}
+    .cal-ev-hora{font-weight:700;flex-shrink:0}
     .cal-ev-nombre{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .cal-more{font-size:10px;color:#94a3b8;margin-top:2px;padding-left:3px}
+    .cal-more{font-size:10px;color:#94a3b8;margin-top:1px;padding-left:2px}
     /* Puntos móvil */
     .cal-dots{display:none;gap:3px;flex-wrap:wrap;padding:3px 1px}
     .cal-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-    @media(max-width:540px){
-      .cal-day{min-height:52px;padding:3px}
+    @media(max-width:600px){
+      .cal-day{min-height:48px;padding:3px 2px}
       .cal-num{width:20px;height:20px;font-size:11px}
       .cal-ev,.cal-more{display:none}
       .cal-dots{display:flex}
@@ -505,9 +509,17 @@ function renderClienteDashboard(cliente, inst, citas) {
 
     function fechaKey(d,m,a){ return String(d).padStart(2,'0')+'/'+String(m+1).padStart(2,'0')+'/'+a; }
 
-    // DEBUG TEMPORAL — muestra info para diagnosticar
-    console.log('CITAS cargadas:', CITAS.length, CITAS.map(c=>c.fecha));
-    console.log('HOY key:', fechaKey(HOY.getDate(), HOY.getMonth(), HOY.getFullYear()));
+    function fmtHora12(str){
+      str=(str||'').trim();
+      if(!str) return '';
+      if(/AM|PM/i.test(str)) return str;
+      const m=str.match(/^(\d{1,2}):(\d{2})/);
+      if(!m) return str;
+      let h=parseInt(m[1]); const min=m[2];
+      const p=h>=12?'PM':'AM';
+      if(h===0)h=12; else if(h>12)h-=12;
+      return h+':'+min+' '+p;
+    }
 
     function claseEv(estado){
       const e = (estado||'').toUpperCase();
@@ -553,13 +565,14 @@ function renderClienteDashboard(cliente, inst, citas) {
         const num = document.createElement('span');
         num.className='cal-num'; num.textContent=d; el.appendChild(num);
 
-        // Pills — máx 3 en escritorio: solo hora + nombre
+        // Pills — máx 3 en escritorio: hora12 + nombre + color por estado
         const max=3;
         citasDia.slice(0,max).forEach(c=>{
           const ev=document.createElement('span');
-          ev.className='cal-ev';
+          ev.className='cal-ev '+claseEv(c.estado);
           ev.title=c.nombre+(c.servicio?' — '+c.servicio:'')+(c.hora?' ('+c.hora+')':'');
-          if(c.hora){const h=document.createElement('span');h.className='cal-ev-hora';h.textContent=c.hora;ev.appendChild(h);}
+          const hora12=fmtHora12(c.hora);
+          if(hora12){const h=document.createElement('span');h.className='cal-ev-hora';h.textContent=hora12;ev.appendChild(h);}
           const n=document.createElement('span');n.className='cal-ev-nombre';n.textContent=c.nombre;ev.appendChild(n);
           el.appendChild(ev);
         });
@@ -601,7 +614,7 @@ function renderClienteDashboard(cliente, inst, citas) {
       lista.innerHTML=sorted.map(c=>{
         const cls=claseEv(c.estado);
         return \`<div class="day-item">
-          <span class="day-hour">\${c.hora||'--:--'}</span>
+          <span class="day-hour">\${fmtHora12(c.hora)||'--:--'}</span>
           <div class="day-info">
             <div class="day-name">\${c.nombre}</div>
             <div class="day-svc">\${c.servicio||'—'}</div>
