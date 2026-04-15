@@ -1175,10 +1175,18 @@ async function cargarCitasPendientesInst(clienteId, sh) {
     const citas = await sh.getCitas();
     let n = 0;
     for (const c of citas.filter(x => x.confirmacion === 'ENVIADO')) {
-      const waId = `${c.telefono}@c.us`;
-      inst.citasPendientes.set(waId, c); n++;
+      const waIdCus = `${c.telefono}@c.us`;
+      inst.citasPendientes.set(waIdCus, c);
+      // También guardar con @lid si el número tiene un ID diferente
+      try {
+        const nid = await inst.client.getNumberId(c.telefono);
+        if (nid && nid._serialized !== waIdCus) {
+          inst.citasPendientes.set(nid._serialized, c);
+        }
+      } catch {}
+      n++;
     }
-    if (n) console.log(`[${clienteId}] ${n} cita(s) pendiente(s) cargada(s)`);
+    if (n) console.log(`[${clienteId}] ${n} cita(s) pendiente(s) cargada(s) (${inst.citasPendientes.size} keys)`);
   } catch (e) { console.error(`[${clienteId}] Error cargando pendientes:`, e.message); }
 }
 
